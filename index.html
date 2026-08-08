@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Offer Poster Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   css/admin.css — standalone styling for admin.html
+   Kept fully separate from the user app's css/style.css by design.
+   ============================================================ */
+:root{
+  --a-ink:#132420;
+  --a-ink-2:#1B342D;
+  --a-ink-3:#20463c;
+  --a-gold:#CC9A3C;
+  --a-gold-soft:#E7C77C;
+  --a-teal:#0E6E5D;
+  --a-coral:#E1553B;
+  --a-coral-2:#C4402A;
+  --a-cream:#F7F5EF;
+  --a-paper:#FFFFFF;
+  --a-text:#152420;
+  --a-muted:#6B7A74;
+  --a-line:#E7E4DC;
+  --a-shadow-1:0 1px 2px rgba(19,36,32,0.06), 0 1px 1px rgba(19,36,32,0.04);
+  --a-shadow-2:0 8px 24px rgba(19,36,32,0.10), 0 2px 6px rgba(19,36,32,0.06);
+  --a-radius:14px;
+  --a-font: 'Manrope', -apple-system, sans-serif;
+  --a-font-display: 'Fraunces', serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;font-family:var(--a-font);background:var(--a-cream);color:var(--a-text);}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+img{max-width:100%;display:block;}
+
+/* ---------- Login screen ---------- */
+#adminLoginScreen{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(130% 90% at 50% -10%, #1c3a32 0%, var(--a-ink) 65%);
+}
+.login-card{
+  width:100%;max-width:400px;background:var(--a-paper);border-radius:22px;padding:36px 30px;
+  box-shadow:0 30px 80px rgba(0,0,0,0.35);
+}
+.login-card .mark{
+  width:52px;height:52px;border-radius:14px;margin:0 auto 18px;
+  background:linear-gradient(145deg,var(--a-gold),var(--a-coral));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--a-font-display);font-weight:800;font-size:22px;
+}
+.login-card h1{font-family:var(--a-font-display);font-size:22px;text-align:center;margin:0 0 4px;}
+.login-card p.sub{text-align:center;color:var(--a-muted);font-size:13px;margin:0 0 24px;}
+.a-field{margin-bottom:14px;}
+.a-field label{display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--a-text);}
+.a-field input, .a-field select, .a-field textarea{
+  width:100%;padding:12px 13px;border-radius:10px;border:1.5px solid var(--a-line);
+  background:var(--a-cream);font-size:14px;outline:none;transition:border-color .15s;
+}
+.a-field input:focus, .a-field select:focus, .a-field textarea:focus{border-color:var(--a-teal);}
+.a-error{color:var(--a-coral-2);font-size:12px;font-weight:600;margin:-4px 0 12px;display:none;}
+
+/* ---------- Buttons ---------- */
+.a-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:11px 18px;border-radius:10px;border:none;font-weight:700;font-size:13.5px;
+  transition:transform .12s, filter .15s;
+}
+.a-btn:active{transform:scale(0.97);}
+.a-btn-primary{background:linear-gradient(135deg,var(--a-teal),#0A5548);color:#fff;}
+.a-btn-gold{background:linear-gradient(135deg,var(--a-gold),#B8842E);color:#1c1204;}
+.a-btn-coral{background:linear-gradient(135deg,var(--a-coral),var(--a-coral-2));color:#fff;}
+.a-btn-outline{background:transparent;border:1.5px solid var(--a-line);color:var(--a-text);}
+.a-btn-outline:hover{border-color:var(--a-teal);}
+.a-btn-sm{padding:7px 12px;font-size:12px;border-radius:8px;}
+.a-btn-block{width:100%;}
+.a-btn:disabled{opacity:.45;pointer-events:none;}
+
+/* ---------- App shell: sidebar + topbar + content ---------- */
+#adminApp{display:none;min-height:100vh;}
+.a-shell{display:flex;min-height:100vh;}
+.a-sidebar{
+  width:230px;flex-shrink:0;background:var(--a-ink);color:var(--a-cream);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:60;
+  transition:transform .25s ease;
+}
+.a-sidebar .brand{
+  display:flex;align-items:center;gap:10px;padding:20px 18px;border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.a-sidebar .brand .mark{
+  width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--a-gold),var(--a-coral));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--a-font-display);font-weight:800;font-size:15px;
+}
+.a-sidebar .brand span{font-family:var(--a-font-display);font-weight:700;font-size:15px;}
+.a-nav{flex:1;overflow-y:auto;padding:10px 0;}
+.a-nav-item{
+  display:flex;align-items:center;gap:12px;padding:12px 20px;font-size:13.5px;font-weight:600;
+  color:rgba(247,245,239,0.65);cursor:pointer;border-left:3px solid transparent;
+}
+.a-nav-item:hover{color:#fff;background:rgba(255,255,255,0.04);}
+.a-nav-item.active{color:#fff;background:rgba(255,255,255,0.07);border-left-color:var(--a-gold);}
+.a-nav-item .ic{font-size:16px;width:18px;text-align:center;}
+.a-sidebar .foot{padding:16px 18px;border-top:1px solid rgba(255,255,255,0.08);}
+.a-sidebar .foot .who{font-size:12px;color:rgba(247,245,239,0.55);margin-bottom:8px;word-break:break-all;}
+
+.a-main{flex:1;margin-left:230px;min-width:0;}
+.a-topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 26px;background:var(--a-paper);border-bottom:1px solid var(--a-line);
+  position:sticky;top:0;z-index:40;
+}
+.a-topbar h1{font-family:var(--a-font-display);font-size:20px;margin:0;}
+.a-hamburger{display:none;background:none;border:none;font-size:22px;color:var(--a-text);}
+.a-content{padding:22px 26px 60px;}
+
+/* ---------- Stat cards ---------- */
+.a-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+.a-stat-card{
+  background:var(--a-paper);border:1px solid var(--a-line);border-radius:var(--a-radius);
+  padding:18px;box-shadow:var(--a-shadow-1);
+}
+.a-stat-card .lbl{font-size:11.5px;font-weight:700;color:var(--a-muted);text-transform:uppercase;letter-spacing:.03em;}
+.a-stat-card .val{font-family:var(--a-font-display);font-size:26px;font-weight:700;margin-top:6px;color:var(--a-ink);}
+.a-stat-card .delta{font-size:11.5px;font-weight:700;margin-top:4px;}
+.a-stat-card .delta.up{color:var(--a-teal);}
+.a-stat-card .delta.down{color:var(--a-coral-2);}
+
+/* ---------- Panels / cards ---------- */
+.a-panel{background:var(--a-paper);border:1px solid var(--a-line);border-radius:var(--a-radius);padding:20px;margin-bottom:20px;box-shadow:var(--a-shadow-1);}
+.a-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.a-panel-head h2{font-family:var(--a-font-display);font-size:17px;margin:0;}
+.a-section{display:none;}
+.a-section.active{display:block;}
+
+/* ---------- Tables ---------- */
+.a-table-wrap{overflow-x:auto;}
+table.a-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.a-table th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--a-muted);
+  padding:10px 12px;border-bottom:1.5px solid var(--a-line);white-space:nowrap;
+}
+table.a-table td{padding:11px 12px;border-bottom:1px solid var(--a-line);vertical-align:middle;}
+table.a-table tr:last-child td{border-bottom:none;}
+table.a-table img.thumb{width:44px;height:56px;object-fit:cover;border-radius:6px;background:var(--a-cream);}
+table.a-table img.thumb-sq{width:40px;height:40px;object-fit:cover;border-radius:8px;background:var(--a-cream);}
+
+/* ---------- Badges / pills / toggles ---------- */
+.a-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;}
+.a-badge.green{background:rgba(14,110,93,0.12);color:var(--a-teal);}
+.a-badge.gold{background:rgba(204,154,60,0.15);color:#8a651f;}
+.a-badge.red{background:rgba(225,85,59,0.12);color:var(--a-coral-2);}
+.a-badge.gray{background:rgba(107,122,116,0.13);color:var(--a-muted);}
+.a-pillrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.a-pill{padding:8px 14px;border-radius:99px;font-size:12.5px;font-weight:700;background:var(--a-cream);border:1px solid var(--a-line);color:var(--a-text);}
+.a-pill.active{background:var(--a-ink);color:#fff;border-color:var(--a-ink);}
+.a-toggle{width:38px;height:22px;border-radius:99px;background:var(--a-line);position:relative;flex-shrink:0;cursor:pointer;}
+.a-toggle.on{background:var(--a-teal);}
+.a-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+.a-toggle.on::after{transform:translateX(16px);}
+
+/* ---------- Search / filters ---------- */
+.a-search{position:relative;max-width:320px;flex:1;}
+.a-search input{width:100%;padding:10px 14px 10px 36px;border-radius:10px;border:1.5px solid var(--a-line);font-size:13.5px;background:var(--a-cream);}
+.a-search::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.6;}
+
+/* ---------- Modal ---------- */
+.a-overlay{position:fixed;inset:0;background:rgba(19,36,32,0.55);z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;}
+.a-overlay.show{opacity:1;pointer-events:auto;}
+.a-modal{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-48%);width:92%;max-width:560px;max-height:88vh;overflow-y:auto;
+  background:var(--a-paper);border-radius:18px;padding:26px;z-index:101;box-shadow:0 30px 80px rgba(0,0,0,0.35);
+  opacity:0;pointer-events:none;transition:all .22s cubic-bezier(.2,.8,.2,1);
+}
+.a-modal.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%);}
+.a-modal h3{font-family:var(--a-font-display);font-size:19px;margin:0 0 16px;}
+.a-modal .close{position:absolute;top:18px;right:20px;font-size:18px;background:none;border:none;color:var(--a-muted);}
+.a-upload-box{
+  border:1.5px dashed var(--a-line);border-radius:12px;height:120px;display:flex;align-items:center;justify-content:center;
+  color:var(--a-muted);cursor:pointer;overflow:hidden;background:var(--a-cream);margin-bottom:6px;
+}
+.a-upload-box img{width:100%;height:100%;object-fit:cover;}
+.a-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* ---------- Asset grid (banners/stickers) ---------- */
+.a-asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;}
+.a-asset-card{border:1px solid var(--a-line);border-radius:12px;overflow:hidden;background:var(--a-cream);}
+.a-asset-card .img{height:90px;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:26px;}
+.a-asset-card .meta{padding:8px 10px;}
+.a-asset-card .meta .name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.a-asset-card .row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-top:1px solid var(--a-line);}
+
+/* ---------- Analytics bars ---------- */
+.a-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.a-bar-row .lbl{width:88px;font-size:11.5px;color:var(--a-muted);flex-shrink:0;}
+.a-bar-track{flex:1;background:var(--a-line);border-radius:6px;height:10px;overflow:hidden;}
+.a-bar-fill{height:100%;background:var(--a-teal);border-radius:6px;}
+.a-bar-row .val{font-size:11.5px;font-weight:700;width:44px;text-align:right;flex-shrink:0;}
+
+.a-empty{text-align:center;padding:40px 20px;color:var(--a-muted);}
+.a-empty .ic{font-size:32px;margin-bottom:8px;}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 960px){
+  .a-stat-grid{grid-template-columns:repeat(2,1fr);}
+  .a-sidebar{transform:translateX(-100%);}
+  .a-sidebar.open{transform:translateX(0);}
+  .a-main{margin-left:0;}
+  .a-hamburger{display:block;}
+  .a-grid-2{grid-template-columns:1fr;}
+}
+@media (max-width: 560px){
+  .a-stat-grid{grid-template-columns:1fr 1fr;}
+  .a-content{padding:16px 14px 50px;}
+  .a-topbar{padding:14px 16px;}
+  .a-asset-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="adminLoginScreen">
+  <div class="login-card">
+    <div class="mark">OP</div>
+    <h1>Admin Sign In</h1>
+    <p class="sub">Offer Poster Studio · Admin Panel<br>Only authorized admin accounts can sign in.</p>
+    <div class="a-field">
+      <label>Admin Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@yourshop.com" autocomplete="username">
+    </div>
+    <div class="a-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="a-error" id="loginError"></div>
+    <button class="a-btn a-btn-primary a-btn-block" onclick="adminLogin()">Sign In</button>
+    <p style="text-align:center;font-size:11.5px;color:var(--a-muted);margin-top:18px;">
+      There is no admin signup. Ask a super-admin to promote your account —
+      <code style="background:var(--a-cream);padding:2px 6px;border-radius:6px;">see sql/schema.sql</code>.
+    </p>
+  </div>
+</div>
+
+<!-- ============ ADMIN APP SHELL ============ -->
+<div id="adminApp">
+  <div class="a-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+  <div class="a-shell">
+
+    <aside class="a-sidebar" id="sidebar">
+      <div class="brand"><div class="mark">OP</div><span>Admin Panel</span></div>
+      <nav class="a-nav" id="navList">
+        <div class="a-nav-item active" data-section="dashboard" onclick="showSection('dashboard')"><span class="ic">📊</span> Dashboard</div>
+        <div class="a-nav-item" data-section="templates" onclick="showSection('templates')"><span class="ic">🗂️</span> Templates</div>
+        <div class="a-nav-item" data-section="banners" onclick="showSection('banners')"><span class="ic">🖼️</span> Hero Banners</div>
+        <div class="a-nav-item" data-section="products" onclick="showSection('products')"><span class="ic">🛒</span> Product Photos</div>
+        <div class="a-nav-item" data-section="stickers" onclick="showSection('stickers')"><span class="ic">✨</span> Stickers</div>
+        <div class="a-nav-item" data-section="users" onclick="showSection('users')"><span class="ic">👥</span> Users</div>
+        <div class="a-nav-item" data-section="plans" onclick="showSection('plans')"><span class="ic">💎</span> Plans</div>
+        <div class="a-nav-item" data-section="payments" onclick="showSection('payments')"><span class="ic">💳</span> Payments</div>
+        <div class="a-nav-item" data-section="posters" onclick="showSection('posters')"><span class="ic">📄</span> Posters</div>
+        <div class="a-nav-item" data-section="analytics" onclick="showSection('analytics')"><span class="ic">📈</span> Analytics</div>
+        <div class="a-nav-item" data-section="settings" onclick="showSection('settings')"><span class="ic">⚙️</span> Settings</div>
+      </nav>
+      <div class="foot">
+        <div class="who" id="adminWhoAmI">—</div>
+        <button class="a-btn a-btn-outline a-btn-block a-btn-sm" onclick="adminLogout()">Log Out</button>
+      </div>
+    </aside>
+
+    <main class="a-main">
+      <div class="a-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="a-hamburger" onclick="openSidebar()">☰</button>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+      </div>
+
+      <div class="a-content">
+
+        <!-- ===== DASHBOARD ===== -->
+        <section class="a-section active" id="section-dashboard">
+          <div class="a-stat-grid" id="statGrid"></div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Pending Payment Approvals</h2><span class="a-badge gold" id="pendingCount">0</span></div>
+            <div class="a-table-wrap"><table class="a-table" id="dashPendingPaymentsTable"><thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Txn ID</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Recently Joined Users</h2></div>
+            <div class="a-table-wrap"><table class="a-table" id="dashRecentUsersTable"><thead><tr><th>Shop</th><th>Email</th><th>Plan</th><th>Joined</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ===== TEMPLATES ===== -->
+        <section class="a-section" id="section-templates">
+          <div class="a-panel-head" style="margin-bottom:16px;">
+            <div class="a-search"><input type="text" id="templateSearch" placeholder="Search templates..." oninput="renderTemplatesTable()"></div>
+            <button class="a-btn a-btn-primary" onclick="openTemplateModal()">+ Create Template</button>
+          </div>
+          <div class="a-pillrow" id="templateCatPills"></div>
+          <div class="a-panel">
+            <div class="a-table-wrap"><table class="a-table" id="templatesTable"><thead><tr><th></th><th>Title</th><th>Category</th><th>Layout</th><th>Status</th><th>Featured</th><th>Premium</th><th>Downloads</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ===== HERO BANNERS ===== -->
+        <section class="a-section" id="section-banners">
+          <div class="a-panel-head" style="margin-bottom:16px;">
+            <div class="a-pillrow" id="bannerTypePills" style="margin:0;"></div>
+            <button class="a-btn a-btn-primary" onclick="openBannerModal()">+ Upload Hero Banner</button>
+          </div>
+          <div class="a-panel">
+            <div class="a-asset-grid" id="bannerGrid"></div>
+          </div>
+        </section>
+
+        <!-- ===== PRODUCT PHOTOS ===== -->
+        <section class="a-section" id="section-products">
+          <div class="a-panel-head" style="margin-bottom:16px;">
+            <div class="a-pillrow" id="productCatPills" style="margin:0;"></div>
+            <button class="a-btn a-btn-primary" onclick="openProductModal()">+ Add Product Photo</button>
+          </div>
+          <p style="font-size:12px;color:var(--a-muted);margin:-10px 0 16px;">These appear in every user's poster editor under "Choose from Product Library" when they tap a photo slot — with MRP/offer price pre-filled.</p>
+          <div class="a-panel">
+            <div class="a-asset-grid" id="productGrid"></div>
+          </div>
+        </section>
+
+        <!-- ===== STICKERS ===== -->
+        <section class="a-section" id="section-stickers">
+          <div class="a-panel-head" style="margin-bottom:16px;">
+            <div class="a-pillrow" id="stickerTypePills" style="margin:0;"></div>
+            <button class="a-btn a-btn-primary" onclick="openStickerModal()">+ Add Sticker</button>
+          </div>
+          <div class="a-panel">
+            <div class="a-asset-grid" id="stickerGrid"></div>
+          </div>
+        </section>
+
+        <!-- ===== USERS ===== -->
+        <section class="a-section" id="section-users">
+          <div class="a-panel-head" style="margin-bottom:16px;">
+            <div class="a-search"><input type="text" id="userSearch" placeholder="Search by shop name or email..." oninput="renderUsersTable()"></div>
+          </div>
+          <div class="a-panel">
+            <div class="a-table-wrap"><table class="a-table" id="usersTable"><thead><tr><th>Shop</th><th>Email</th><th>Plan</th><th>Expires</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ===== PLANS ===== -->
+        <section class="a-section" id="section-plans">
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Plan Pricing</h2></div>
+            <div class="a-grid-2">
+              <div class="a-field"><label>Premium Plan Price (₹ / month)</label><input type="number" id="planPremiumPrice"></div>
+              <div class="a-field"><label>Business Plan Price (₹ / month)</label><input type="number" id="planBusinessPrice"></div>
+            </div>
+            <button class="a-btn a-btn-primary" onclick="savePlanPricing()">Save Pricing</button>
+          </div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Manage a User's Plan</h2></div>
+            <div class="a-field"><label>Search user</label><input type="text" id="planUserSearch" placeholder="Type shop name or email..." oninput="renderPlanUserResults()"></div>
+            <div id="planUserResults"></div>
+          </div>
+        </section>
+
+        <!-- ===== PAYMENTS ===== -->
+        <section class="a-section" id="section-payments">
+          <div class="a-pillrow" id="paymentStatusPills"></div>
+          <div class="a-panel">
+            <div class="a-table-wrap"><table class="a-table" id="paymentsTable"><thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Txn ID</th><th>Screenshot</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ===== POSTERS ===== -->
+        <section class="a-section" id="section-posters">
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>All Saved Posters</h2><span class="a-badge gray">Only the latest 3 per user are kept automatically</span></div>
+            <div class="a-table-wrap"><table class="a-table" id="postersTable"><thead><tr><th></th><th>Title</th><th>User</th><th>Type</th><th>Updated</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ===== ANALYTICS ===== -->
+        <section class="a-section" id="section-analytics">
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Downloads — Last 14 Days</h2></div>
+            <div id="dailyDownloadsChart"></div>
+          </div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Downloads — Last 6 Months</h2></div>
+            <div id="monthlyDownloadsChart"></div>
+          </div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Most Popular Templates</h2></div>
+            <div id="popularTemplatesChart"></div>
+          </div>
+        </section>
+
+        <!-- ===== SETTINGS ===== -->
+        <section class="a-section" id="section-settings">
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Payment Settings</h2></div>
+            <div class="a-grid-2">
+              <div class="a-field"><label>UPI ID</label><input type="text" id="settingsUpiId"></div>
+              <div class="a-field"><label>WhatsApp Number</label><input type="text" id="settingsWhatsapp"></div>
+            </div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px;">UPI QR Code Image</label>
+            <div class="a-upload-box" id="qrPreview" onclick="document.getElementById('qrInput').click()">Tap to upload QR image</div>
+            <input type="file" id="qrInput" accept="image/*" style="display:none;" onchange="handleQrUpload(event)">
+          </div>
+          <div class="a-panel">
+            <div class="a-panel-head"><h2>Business Settings</h2></div>
+            <div class="a-grid-2">
+              <div class="a-field"><label>Business Name</label><input type="text" id="settingsBusinessName"></div>
+              <div class="a-field"><label>Support Email</label><input type="email" id="settingsSupportEmail"></div>
+            </div>
+            <div class="a-field"><label>Watermark Text (shown on free-plan exports)</label><input type="text" id="settingsWatermark"></div>
+            <div class="a-field"><label>Free Plan — Downloads Per Day</label><input type="number" id="settingsFreeLimit" min="0"></div>
+          </div>
+          <button class="a-btn a-btn-primary a-btn-block" onclick="saveAllSettings()">Save All Settings</button>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="a-overlay" id="modalOverlay" onclick="closeAllModals()"></div>
+
+<!-- Template create/edit modal -->
+<div class="a-modal" id="templateModal">
+  <button class="close" onclick="closeAllModals()">✕</button>
+  <h3 id="templateModalTitle">Create Template</h3>
+  <div class="a-field"><label>Title</label><input type="text" id="tplTitle" placeholder="e.g. Onam Grand Sale"></div>
+  <div class="a-grid-2">
+    <div class="a-field"><label>Category</label><select id="tplCategory"></select></div>
+    <div class="a-field"><label>Festival Tag (optional)</label><input type="text" id="tplFestival" placeholder="e.g. Onam"></div>
+  </div>
+  <div class="a-grid-2">
+    <div class="a-field"><label>Product Layout</label>
+      <select id="tplLayout">
+        <option value="1">1 Product</option><option value="2">2 Products</option>
+        <option value="4">4 Products</option><option value="6">6 Products</option>
+        <option value="9">9 Products</option><option value="12">12 Products</option>
+      </select>
+    </div>
+    <div class="a-field"><label>Theme Color</label><input type="color" id="tplThemeColor" value="#0E6E5D" style="height:44px;padding:4px;"></div>
+  </div>
+  <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px;">Hero Banner (pick from library, optional)</label>
+  <select id="tplHeroBanner" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--a-line);margin-bottom:14px;"><option value="">— Plain gradient header —</option></select>
+  <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px;">Thumbnail Image</label>
+  <div class="a-upload-box" id="tplThumbPreview" onclick="document.getElementById('tplThumbInput').click()">Tap to upload thumbnail</div>
+  <input type="file" id="tplThumbInput" accept="image/*" style="display:none;" onchange="handleTplThumbUpload(event)">
+  <div class="a-grid-2" style="margin-top:14px;">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;"><input type="checkbox" id="tplFeatured"> Featured</label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;"><input type="checkbox" id="tplPremium"> Premium (locked)</label>
+  </div>
+  <button class="a-btn a-btn-primary a-btn-block" style="margin-top:18px;" onclick="saveTemplate()">Save Template</button>
+</div>
+
+<!-- Hero banner upload modal -->
+<div class="a-modal" id="bannerModal">
+  <button class="close" onclick="closeAllModals()">✕</button>
+  <h3>Upload Hero Banner</h3>
+  <div class="a-field"><label>Name</label><input type="text" id="bannerName" placeholder="e.g. Supermarket Aisle Wide"></div>
+  <div class="a-field"><label>Banner Type</label>
+    <select id="bannerType"><option value="supermarket">Supermarket</option><option value="festival">Festival</option><option value="offer">Offer</option></select>
+  </div>
+  <div class="a-upload-box" id="bannerPreview" onclick="document.getElementById('bannerInput').click()" style="height:140px;">Tap to upload banner photo</div>
+  <input type="file" id="bannerInput" accept="image/*" style="display:none;" onchange="handleBannerUpload(event)">
+  <button class="a-btn a-btn-primary a-btn-block" style="margin-top:16px;" onclick="saveBanner()">Add to Library</button>
+</div>
+
+<!-- Product photo upload modal -->
+<div class="a-modal" id="productModal">
+  <button class="close" onclick="closeAllModals()">✕</button>
+  <h3 id="productModalTitle">Add Product Photo</h3>
+  <div class="a-field"><label>Product Name</label><input type="text" id="productName" placeholder="e.g. Basmati Rice 5kg"></div>
+  <div class="a-grid-2">
+    <div class="a-field"><label>Category</label><select id="productCategory"></select></div>
+    <div class="a-field"><label>Brand (optional)</label><input type="text" id="productBrand" placeholder="e.g. India Gate"></div>
+  </div>
+  <div class="a-grid-2">
+    <div class="a-field"><label>MRP (₹)</label><input type="number" id="productMrp" placeholder="599"></div>
+    <div class="a-field"><label>Offer Price (₹)</label><input type="number" id="productOfferPrice" placeholder="449"></div>
+  </div>
+  <div class="a-upload-box" id="productPreview" onclick="document.getElementById('productInput').click()" style="height:130px;">Tap to upload product photo</div>
+  <input type="file" id="productInput" accept="image/*" style="display:none;" onchange="handleProductUpload(event)">
+  <button class="a-btn a-btn-primary a-btn-block" style="margin-top:16px;" onclick="saveProduct()">Save to Library</button>
+</div>
+
+<!-- Sticker upload modal -->
+<div class="a-modal" id="stickerModal">
+  <button class="close" onclick="closeAllModals()">✕</button>
+  <h3>Add Sticker / Badge</h3>
+  <div class="a-field"><label>Name</label><input type="text" id="stickerName" placeholder="e.g. 50% OFF Burst"></div>
+  <div class="a-field"><label>Type</label>
+    <select id="stickerType">
+      <option value="sticker">Sale Sticker</option>
+      <option value="badge">Discount Badge</option>
+      <option value="festival_decoration">Festival Sticker</option>
+      <option value="offer_label">Offer Badge</option>
+      <option value="price_tag">Price Tag</option>
+    </select>
+  </div>
+  <div class="a-upload-box" id="stickerPreview" onclick="document.getElementById('stickerInput').click()">Tap to upload image</div>
+  <input type="file" id="stickerInput" accept="image/*" style="display:none;" onchange="handleStickerUpload(event)">
+  <button class="a-btn a-btn-primary a-btn-block" style="margin-top:16px;" onclick="saveSticker()">Add to Library</button>
+</div>
+
+<!-- Payment review modal -->
+<div class="a-modal" id="paymentModal">
+  <button class="close" onclick="closeAllModals()">✕</button>
+  <h3>Review Payment</h3>
+  <div id="paymentModalBody"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ============================================================
+// js/supabase.js
+// Shared Supabase client + auth/data helpers for the whole app
+// (both the user-facing pages and admin.html import this file)
+// ============================================================
+
+// ------------------------------------------------------------
+// 1) FILL THESE IN — Settings → API in your Supabase project
+// ------------------------------------------------------------
+const SUPABASE_URL = 'https://peftmuasykbcrhtkhhjf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZnRtdWFzeWtiY3JodGtoaGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3MzkzMTIsImV4cCI6MjEwMTMxNTMxMn0.oiFn_41F-jBxK8tizA3qPoC1UPJPC72SvNxyxiUlhGY';
+
+// Loaded via the Supabase JS CDN script tag (see the <head> above),
+// which must appear before this script block runs.
+if (typeof window.supabase === 'undefined') {
+  console.error('Supabase JS library not found. Include the CDN script tag before js/supabase.js');
+}
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// AUTH HELPERS
+// ============================================================
+
+/** Sign up a new business user. Creates the auth user; the DB trigger
+ *  handle_new_user() auto-creates their profiles row with role='business'. */
+async function authSignUp(email, password, shopName) {
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { data: { shop_name: shopName || 'My Shop' } }
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function authSignIn(email, password) {
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
+
+async function authSignOut() {
+  await sb.auth.signOut();
+}
+
+async function authSendPasswordReset(email) {
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/index.html'
+  });
+  if (error) throw error;
+}
+
+/** Returns the current session's user (or null). */
+async function getCurrentUser() {
+  const { data } = await sb.auth.getUser();
+  return data?.user || null;
+}
+
+/** Returns the profiles row for the current user (or null if not logged in). */
+async function getCurrentProfile() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (error) { console.error(error); return null; }
+  return data;
+}
+
+/** Guard for user-facing pages: redirects to index.html if not logged in.
+ *  Also silently calls expire_plans() so plan status is always fresh. */
+async function requireUserAuth() {
+  const user = await getCurrentUser();
+  if (!user) { window.location.href = 'index.html'; return null; }
+  try { await sb.rpc('expire_plans'); } catch (e) { /* non-fatal */ }
+  const profile = await getCurrentProfile();
+  if (profile?.suspended) {
+    alert('Your account has been suspended. Contact support.');
+    await authSignOut();
+    window.location.href = 'index.html';
+    return null;
+  }
+  return { user, profile };
+}
+
+/** Guard for admin.html: redirects to admin.html's own login screen if not
+ *  logged in OR not an admin. Call this at the top of admin.js. */
+async function requireAdminAuth() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== 'admin') {
+    await authSignOut();
+    return null;
+  }
+  return { user, profile };
+}
+
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+
+/** Uploads a File object to a bucket and returns its public URL.
+ *  pathPrefix lets you namespace uploads (e.g. a user's own id folder). */
+async function uploadFile(bucket, file, pathPrefix) {
+  const ext = file.name.split('.').pop();
+  const path = `${pathPrefix ? pathPrefix + '/' : ''}${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(path, file, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  const { data } = sb.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ============================================================
+// SMALL SHARED UI UTILITIES (used across pages)
+// ============================================================
+
+function showToast(msg, isError) {
+  let t = document.getElementById('sharedToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sharedToast';
+    t.style.position = 'fixed';
+    t.style.left = '50%';
+    t.style.bottom = '30px';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+    t.style.background = '#132420';
+    t.style.color = '#FBF6EA';
+    t.style.padding = '12px 18px';
+    t.style.borderRadius = '12px';
+    t.style.fontSize = '13px';
+    t.style.fontWeight = '600';
+    t.style.zIndex = '9999';
+    t.style.opacity = '0';
+    t.style.transition = 'all .28s cubic-bezier(.2,.8,.2,1)';
+    t.style.maxWidth = '80%';
+    t.style.textAlign = 'center';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = isError ? '#C4402A' : '#132420';
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 2400);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function fmtMoney(n) {
+  return '₹' + Number(n || 0).toLocaleString('en-IN');
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+
+/* ============================================================
+   ADMIN.JS (merged inline)
+   ============================================================ */
+
+// ============================================================
+// js/admin.js — Admin Panel logic (admin.html)
+// Depends on js/supabase.js being loaded first (provides `sb` and helpers)
+// ============================================================
+
+let CATEGORIES = [];
+let TEMPLATES = [];
+let BANNERS = [];
+let PRODUCTS = [];
+let STICKERS = [];
+let USERS = [];
+let PAYMENTS = [];
+let POSTERS = [];
+let SETTINGS = {};
+let CURRENT_ADMIN = null;
+
+let tplCatFilter = 'all';
+let bannerTypeFilter = 'all';
+let productCatFilter = 'all';
+let stickerTypeFilter = 'all';
+let paymentStatusFilter = 'pending';
+
+// ============================================================
+// BOOT / AUTH
+// ============================================================
+async function boot() {
+  const session = await requireAdminAuth();
+  if (!session) {
+    document.getElementById('adminLoginScreen').style.display = 'flex';
+    document.getElementById('adminApp').style.display = 'none';
+    return;
+  }
+  CURRENT_ADMIN = session.profile;
+  document.getElementById('adminLoginScreen').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'block';
+  document.getElementById('adminWhoAmI').textContent = CURRENT_ADMIN.email;
+  await loadAllData();
+  const { data: payData, error: payErr } = await sb
+    .from('payments')
+    .select('*, profiles!payments_user_id_fkey(shop_name, email)')
+    .order('created_at', { ascending: false });
+
+  if (payErr) {
+    console.error('Error loading payments:', payErr.message);
+  }
+  PAYMENTS = payData || [];
+
+  renderDashboard();
+}
+
+async function adminLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Enter both email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    await authSignIn(email, password);
+    const profile = await getCurrentProfile();
+    if (!profile || profile.role !== 'admin') {
+      await authSignOut();
+      errEl.textContent = 'This account does not have admin access.';
+      errEl.style.display = 'block';
+      return;
+    }
+    await boot();
+  } catch (e) {
+    errEl.textContent = e.message || 'Sign in failed.';
+    errEl.style.display = 'block';
+  }
+}
+
+async function adminLogout() {
+  await authSignOut();
+  window.location.reload();
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+const SECTION_TITLES = {
+  dashboard: 'Dashboard', templates: 'Templates', banners: 'Hero Banners', products: 'Product Photos', stickers: 'Stickers',
+  users: 'Users', plans: 'Plans', payments: 'Payments', posters: 'Posters',
+  analytics: 'Analytics', settings: 'Settings'
+};
+function showSection(name) {
+  document.querySelectorAll('.a-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.a-nav-item').forEach(n => n.classList.toggle('active', n.dataset.section === name));
+  document.getElementById('pageTitle').textContent = SECTION_TITLES[name] || name;
+  closeSidebar();
+  if (name === 'analytics') renderAnalytics();
+  if (name === 'settings') renderSettingsForm();
+}
+function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarOverlay').classList.add('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarOverlay').classList.remove('show'); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(id) { document.getElementById('modalOverlay').classList.add('show'); document.getElementById(id).classList.add('show'); }
+function closeAllModals() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  document.querySelectorAll('.a-modal').forEach(m => m.classList.remove('show'));
+}
+
+// ============================================================
+// LOAD ALL DATA
+// ============================================================
+async function loadAllData() {
+  const [cats, tpls, banners, products, stickers, users, payments, posters, settingsRow] = await Promise.all([
+    sb.from('categories').select('*').order('label'),
+    sb.from('templates').select('*').order('created_at', { ascending: false }),
+    sb.from('hero_banners').select('*').order('created_at', { ascending: false }),
+    sb.from('products').select('*').order('created_at', { ascending: false }),
+    sb.from('store_assets').select('*').order('created_at', { ascending: false }),
+    sb.from('profiles').select('*').order('created_at', { ascending: false }),
+    sb.from('payments').select('*, profiles(shop_name, email)').order('created_at', { ascending: false }),
+    sb.from('posters').select('*, profiles(shop_name, email)').order('updated_at', { ascending: false }),
+    sb.from('settings').select('*').eq('id', 1).single()
+  ]);
+  CATEGORIES = cats.data || [];
+  TEMPLATES = tpls.data || [];
+  BANNERS = banners.data || [];
+  PRODUCTS = products.data || [];
+  STICKERS = stickers.data || [];
+  USERS = users.data || [];
+  PAYMENTS = payments.data || [];
+  POSTERS = posters.data || [];
+  SETTINGS = settingsRow.data || {};
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const totalUsers = USERS.length;
+  const premiumUsers = USERS.filter(u => u.plan !== 'free').length;
+  const activePlans = USERS.filter(u => u.plan !== 'free' && (!u.plan_expires_at || new Date(u.plan_expires_at) >= new Date())).length;
+  const expiredPlans = USERS.filter(u => u.plan_expires_at && new Date(u.plan_expires_at) < new Date()).length;
+  const totalTemplates = TEMPLATES.length;
+  const totalDownloads = TEMPLATES.reduce((s, t) => s + (t.downloads || 0), 0);
+  const revenue = PAYMENTS.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount || 0), 0);
+  const pendingPayments = PAYMENTS.filter(p => p.status === 'pending').length;
+
+  const stats = [
+    ['Total Users', totalUsers], ['Premium Users', premiumUsers], ['Total Templates', totalTemplates],
+    ['Total Downloads', totalDownloads], ['Revenue', fmtMoney(revenue)], ['Active Plans', activePlans],
+    ['Expired Plans', expiredPlans], ['Pending Payments', pendingPayments]
+  ];
+  document.getElementById('statGrid').innerHTML = stats.map(([lbl, val]) => `
+    <div class="a-stat-card"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`).join('');
+
+  document.getElementById('pendingCount').textContent = pendingPayments;
+  const pendingRows = PAYMENTS.filter(p => p.status === 'pending').slice(0, 8);
+  document.querySelector('#dashPendingPaymentsTable tbody').innerHTML = pendingRows.length ? pendingRows.map(p => `
+    <tr>
+      <td>${escapeHtml(p.profiles?.shop_name || '—')}</td>
+      <td><span class="a-badge gold">${p.plan}</span></td>
+      <td>${fmtMoney(p.amount)}</td>
+      <td>${escapeHtml(p.upi_transaction_id || '—')}</td>
+      <td>${fmtDate(p.created_at)}</td>
+      <td><button class="a-btn a-btn-outline a-btn-sm" onclick="openPaymentModal('${p.id}')">Review</button></td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--a-muted);padding:24px;">No pending payments 🎉</td></tr>`;
+
+  const recentUsers = USERS.slice(0, 8);
+  document.querySelector('#dashRecentUsersTable tbody').innerHTML = recentUsers.map(u => `
+    <tr>
+      <td>${escapeHtml(u.shop_name || '—')}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="a-badge ${u.plan === 'free' ? 'gray' : 'green'}">${u.plan}</span></td>
+      <td>${fmtDate(u.created_at)}</td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// TEMPLATES
+// ============================================================
+function renderTemplateCatPills() {
+  const pills = [{ id: 'all', label: 'All' }, ...CATEGORIES];
+  document.getElementById('templateCatPills').innerHTML = pills.map(c => `
+    <div class="a-pill ${tplCatFilter === c.id ? 'active' : ''}" onclick="setTplCatFilter('${c.id}')">${c.icon ? c.icon + ' ' : ''}${c.label}</div>`).join('');
+}
+function setTplCatFilter(id) { tplCatFilter = id; renderTemplateCatPills(); renderTemplatesTable(); }
+function renderTemplatesTable() {
+  renderTemplateCatPills();
+  const q = (document.getElementById('templateSearch').value || '').toLowerCase().trim();
+  let list = TEMPLATES;
+  if (tplCatFilter !== 'all') list = list.filter(t => t.category_id === tplCatFilter);
+  if (q) list = list.filter(t => t.title.toLowerCase().includes(q));
+  document.querySelector('#templatesTable tbody').innerHTML = list.length ? list.map(t => `
+    <tr>
+      <td>${t.thumb_url ? `<img class="thumb" src="${t.thumb_url}">` : '—'}</td>
+      <td>${escapeHtml(t.title)}${t.festival ? `<div style="font-size:11px;color:var(--a-muted);">${escapeHtml(t.festival)}</div>` : ''}</td>
+      <td>${escapeHtml(CATEGORIES.find(c => c.id === t.category_id)?.label || t.category_id || '—')}</td>
+      <td>${t.layout}</td>
+      <td><div class="a-toggle ${t.enabled ? 'on' : ''}" onclick="toggleTemplateField('${t.id}','enabled',${!t.enabled})"></div></td>
+      <td><div class="a-toggle ${t.featured ? 'on' : ''}" onclick="toggleTemplateField('${t.id}','featured',${!t.featured})"></div></td>
+      <td><div class="a-toggle ${t.premium ? 'on' : ''}" onclick="toggleTemplateField('${t.id}','premium',${!t.premium})"></div></td>
+      <td>${t.downloads || 0}</td>
+      <td style="white-space:nowrap;">
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="openTemplateModal('${t.id}')">Edit</button>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="duplicateTemplate('${t.id}')">Duplicate</button>
+        <button class="a-btn a-btn-outline a-btn-sm" style="color:var(--a-coral-2);border-color:var(--a-coral-2);" onclick="deleteTemplateAdmin('${t.id}')">Delete</button>
+      </td>
+    </tr>`).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--a-muted);padding:24px;">No templates found.</td></tr>`;
+}
+async function toggleTemplateField(id, field, value) {
+  const { error } = await sb.from('templates').update({ [field]: value }).eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  const t = TEMPLATES.find(t => t.id === id); if (t) t[field] = value;
+  renderTemplatesTable();
+  showToast('Template updated');
+}
+async function duplicateTemplate(id) {
+  const t = TEMPLATES.find(t => t.id === id); if (!t) return;
+  const copy = { ...t, id: undefined, title: t.title + ' (Copy)', downloads: 0, created_at: undefined };
+  const { data, error } = await sb.from('templates').insert(copy).select().single();
+  if (error) { showToast(error.message, true); return; }
+  TEMPLATES.unshift(data);
+  renderTemplatesTable();
+  showToast('Template duplicated');
+}
+async function deleteTemplateAdmin(id) {
+  if (!confirm('Delete this template permanently?')) return;
+  const { error } = await sb.from('templates').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  TEMPLATES = TEMPLATES.filter(t => t.id !== id);
+  renderTemplatesTable();
+  showToast('Template deleted');
+}
+
+let editingTemplateId = null;
+let tplThumbUrl = null;
+function openTemplateModal(id) {
+  editingTemplateId = id || null;
+  tplThumbUrl = null;
+  document.getElementById('templateModalTitle').textContent = id ? 'Edit Template' : 'Create Template';
+  document.getElementById('tplCategory').innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+  document.getElementById('tplHeroBanner').innerHTML = '<option value="">— Plain gradient header —</option>' +
+    BANNERS.filter(b => b.enabled).map(b => `<option value="${b.image_url}">${escapeHtml(b.name)} (${b.banner_type})</option>`).join('');
+  document.getElementById('tplThumbPreview').innerHTML = 'Tap to upload thumbnail';
+
+  if (id) {
+    const t = TEMPLATES.find(t => t.id === id);
+    document.getElementById('tplTitle').value = t.title;
+    document.getElementById('tplCategory').value = t.category_id || '';
+    document.getElementById('tplFestival').value = t.festival || '';
+    document.getElementById('tplLayout').value = t.layout;
+    document.getElementById('tplThemeColor').value = t.theme_color || '#0E6E5D';
+    document.getElementById('tplHeroBanner').value = t.hero_banner_url || '';
+    document.getElementById('tplFeatured').checked = !!t.featured;
+    document.getElementById('tplPremium').checked = !!t.premium;
+    tplThumbUrl = t.thumb_url || null;
+    if (tplThumbUrl) document.getElementById('tplThumbPreview').innerHTML = `<img src="${tplThumbUrl}">`;
+  } else {
+    document.getElementById('tplTitle').value = '';
+    document.getElementById('tplFestival').value = '';
+    document.getElementById('tplLayout').value = '4';
+    document.getElementById('tplThemeColor').value = '#0E6E5D';
+    document.getElementById('tplFeatured').checked = false;
+    document.getElementById('tplPremium').checked = false;
+  }
+  openModal('templateModal');
+}
+async function handleTplThumbUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    tplThumbUrl = await uploadFile('template-thumbs', file);
+    document.getElementById('tplThumbPreview').innerHTML = `<img src="${tplThumbUrl}">`;
+  } catch (err) { showToast(err.message, true); }
+}
+async function saveTemplate() {
+  const title = document.getElementById('tplTitle').value.trim();
+  if (!title) { showToast('Enter a template title', true); return; }
+  const payload = {
+    title,
+    category_id: document.getElementById('tplCategory').value,
+    festival: document.getElementById('tplFestival').value.trim(),
+    layout: document.getElementById('tplLayout').value,
+    theme_color: document.getElementById('tplThemeColor').value,
+    hero_banner_url: document.getElementById('tplHeroBanner').value || null,
+    thumb_url: tplThumbUrl,
+    featured: document.getElementById('tplFeatured').checked,
+    premium: document.getElementById('tplPremium').checked
+  };
+  if (editingTemplateId) {
+    const { data, error } = await sb.from('templates').update(payload).eq('id', editingTemplateId).select().single();
+    if (error) { showToast(error.message, true); return; }
+    const idx = TEMPLATES.findIndex(t => t.id === editingTemplateId);
+    if (idx >= 0) TEMPLATES[idx] = data;
+    showToast('Template updated');
+  } else {
+    payload.enabled = true; payload.trending = false; payload.is_new = true; payload.downloads = 0;
+    payload.created_by = CURRENT_ADMIN.id;
+    const { data, error } = await sb.from('templates').insert(payload).select().single();
+    if (error) { showToast(error.message, true); return; }
+    TEMPLATES.unshift(data);
+    showToast('Template created');
+  }
+  closeAllModals();
+  renderTemplatesTable();
+}
+
+// ============================================================
+// HERO BANNERS
+// ============================================================
+function renderBannerTypePills() {
+  const types = [{ id: 'all', label: 'All' }, { id: 'supermarket', label: 'Supermarket' }, { id: 'festival', label: 'Festival' }, { id: 'offer', label: 'Offer' }];
+  document.getElementById('bannerTypePills').innerHTML = types.map(t => `
+    <div class="a-pill ${bannerTypeFilter === t.id ? 'active' : ''}" onclick="setBannerTypeFilter('${t.id}')">${t.label}</div>`).join('');
+}
+function setBannerTypeFilter(id) { bannerTypeFilter = id; renderBannerTypePills(); renderBannerGrid(); }
+function renderBannerGrid() {
+  renderBannerTypePills();
+  let list = BANNERS;
+  if (bannerTypeFilter !== 'all') list = list.filter(b => b.banner_type === bannerTypeFilter);
+  document.getElementById('bannerGrid').innerHTML = list.length ? list.map(b => `
+    <div class="a-asset-card">
+      <div class="img" style="background-image:url('${b.image_url}')"></div>
+      <div class="meta"><div class="name">${escapeHtml(b.name)}</div><span class="a-badge gray">${b.banner_type}</span></div>
+      <div class="row">
+        <div class="a-toggle ${b.enabled ? 'on' : ''}" onclick="toggleBannerEnabled('${b.id}', ${!b.enabled})"></div>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="deleteBanner('${b.id}')">🗑</button>
+      </div>
+    </div>`).join('') : `<div class="a-empty"><div class="ic">🖼️</div>No hero banners yet.</div>`;
+}
+async function toggleBannerEnabled(id, value) {
+  const { error } = await sb.from('hero_banners').update({ enabled: value }).eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  const b = BANNERS.find(b => b.id === id); if (b) b.enabled = value;
+  renderBannerGrid();
+}
+async function deleteBanner(id) {
+  if (!confirm('Delete this hero banner from the library?')) return;
+  const { error } = await sb.from('hero_banners').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  BANNERS = BANNERS.filter(b => b.id !== id);
+  renderBannerGrid();
+  showToast('Banner deleted');
+}
+let bannerImgUrl = null;
+function openBannerModal() {
+  bannerImgUrl = null;
+  document.getElementById('bannerName').value = '';
+  document.getElementById('bannerType').value = 'supermarket';
+  document.getElementById('bannerPreview').innerHTML = 'Tap to upload banner photo';
+  openModal('bannerModal');
+}
+async function handleBannerUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    bannerImgUrl = await uploadFile('hero-banners', file);
+    document.getElementById('bannerPreview').innerHTML = `<img src="${bannerImgUrl}">`;
+  } catch (err) { showToast(err.message, true); }
+}
+async function saveBanner() {
+  const name = document.getElementById('bannerName').value.trim();
+  if (!name) { showToast('Enter a name', true); return; }
+  if (!bannerImgUrl) { showToast('Upload a photo first', true); return; }
+  const payload = { name, banner_type: document.getElementById('bannerType').value, image_url: bannerImgUrl, enabled: true, created_by: CURRENT_ADMIN.id };
+  const { data, error } = await sb.from('hero_banners').insert(payload).select().single();
+  if (error) { showToast(error.message, true); return; }
+  BANNERS.unshift(data);
+  closeAllModals();
+  renderBannerGrid();
+  showToast('Hero banner added');
+}
+
+// ============================================================
+// PRODUCT PHOTOS (photo library users pick from in their poster editor)
+// ============================================================
+function renderProductCatPills() {
+  const cats = [{ id: 'all', label: 'All' }, ...CATEGORIES];
+  document.getElementById('productCatPills').innerHTML = cats.map(c => `
+    <div class="a-pill ${productCatFilter === c.id ? 'active' : ''}" onclick="setProductCatFilter('${c.id}')">${c.icon ? c.icon + ' ' : ''}${escapeHtml(c.label)}</div>`).join('');
+}
+function setProductCatFilter(id) { productCatFilter = id; renderProductCatPills(); renderProductGrid(); }
+function renderProductGrid() {
+  renderProductCatPills();
+  let list = PRODUCTS;
+  if (productCatFilter !== 'all') list = list.filter(p => p.category_id === productCatFilter);
+  document.getElementById('productGrid').innerHTML = list.length ? list.map(p => `
+    <div class="a-asset-card">
+      <div class="img" style="background-image:url('${p.image_url}')"></div>
+      <div class="meta">
+        <div class="name">${escapeHtml(p.name)}</div>
+        <span class="a-badge gray">${escapeHtml(CATEGORIES.find(c => c.id === p.category_id)?.label || p.category_id || '—')}</span>
+        ${p.mrp ? `<div style="font-size:11px;color:var(--a-muted);margin-top:4px;">MRP ${fmtMoney(p.mrp)}${p.offer_price ? ' → ' + fmtMoney(p.offer_price) : ''}</div>` : ''}
+      </div>
+      <div class="row">
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="openProductModal('${p.id}')">Edit</button>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="deleteProduct('${p.id}')">🗑</button>
+      </div>
+    </div>`).join('') : `<div class="a-empty"><div class="ic">🛒</div>No product photos yet — add some so users can pick them straight into their posters.</div>`;
+}
+let productImgUrl = null;
+let editingProductId = null;
+function openProductModal(id) {
+  editingProductId = id || null;
+  productImgUrl = null;
+  document.getElementById('productModalTitle').textContent = id ? 'Edit Product Photo' : 'Add Product Photo';
+  document.getElementById('productCategory').innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join('');
+  document.getElementById('productPreview').innerHTML = 'Tap to upload product photo';
+  if (id) {
+    const p = PRODUCTS.find(p => p.id === id);
+    document.getElementById('productName').value = p.name;
+    document.getElementById('productCategory').value = p.category_id || '';
+    document.getElementById('productBrand').value = p.brand || '';
+    document.getElementById('productMrp').value = p.mrp || '';
+    document.getElementById('productOfferPrice').value = p.offer_price || '';
+    productImgUrl = p.image_url;
+    document.getElementById('productPreview').innerHTML = `<img src="${p.image_url}">`;
+  } else {
+    document.getElementById('productName').value = '';
+    document.getElementById('productBrand').value = '';
+    document.getElementById('productMrp').value = '';
+    document.getElementById('productOfferPrice').value = '';
+  }
+  openModal('productModal');
+}
+async function handleProductUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    productImgUrl = await uploadFile('product-photos', file);
+    document.getElementById('productPreview').innerHTML = `<img src="${productImgUrl}">`;
+  } catch (err) { showToast(err.message, true); }
+}
+async function saveProduct() {
+  const name = document.getElementById('productName').value.trim();
+  if (!name) { showToast('Enter a product name', true); return; }
+  if (!productImgUrl) { showToast('Upload a photo first', true); return; }
+  const mrp = Number(document.getElementById('productMrp').value) || null;
+  const offerPrice = Number(document.getElementById('productOfferPrice').value) || null;
+  const payload = {
+    name, category_id: document.getElementById('productCategory').value,
+    brand: document.getElementById('productBrand').value.trim(),
+    mrp, offer_price: offerPrice,
+    discount_pct: (mrp && offerPrice && mrp > offerPrice) ? Math.round((mrp - offerPrice) / mrp * 100) : null,
+    image_url: productImgUrl
+  };
+  if (editingProductId) {
+    const { data, error } = await sb.from('products').update(payload).eq('id', editingProductId).select().single();
+    if (error) { showToast(error.message, true); return; }
+    const idx = PRODUCTS.findIndex(p => p.id === editingProductId);
+    if (idx >= 0) PRODUCTS[idx] = data;
+    showToast('Product photo updated');
+  } else {
+    payload.created_by = CURRENT_ADMIN.id;
+    const { data, error } = await sb.from('products').insert(payload).select().single();
+    if (error) { showToast(error.message, true); return; }
+    PRODUCTS.unshift(data);
+    showToast('Product photo added');
+  }
+  closeAllModals();
+  renderProductGrid();
+}
+async function deleteProduct(id) {
+  if (!confirm('Delete this product photo from the library?')) return;
+  const { error } = await sb.from('products').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  PRODUCTS = PRODUCTS.filter(p => p.id !== id);
+  renderProductGrid();
+  showToast('Product photo deleted');
+}
+
+// ============================================================
+// STICKERS
+// ============================================================
+const STICKER_TYPE_LABELS = { sticker: 'Sale Sticker', badge: 'Discount Badge', festival_decoration: 'Festival Sticker', offer_label: 'Offer Badge', price_tag: 'Price Tag' };
+function renderStickerTypePills() {
+  const types = [{ id: 'all', label: 'All' }, ...Object.keys(STICKER_TYPE_LABELS).map(id => ({ id, label: STICKER_TYPE_LABELS[id] }))];
+  document.getElementById('stickerTypePills').innerHTML = types.map(t => `
+    <div class="a-pill ${stickerTypeFilter === t.id ? 'active' : ''}" onclick="setStickerTypeFilter('${t.id}')">${t.label}</div>`).join('');
+}
+function setStickerTypeFilter(id) { stickerTypeFilter = id; renderStickerTypePills(); renderStickerGrid(); }
+function renderStickerGrid() {
+  renderStickerTypePills();
+  let list = STICKERS.filter(s => s.type !== 'logo' && s.type !== 'background');
+  if (stickerTypeFilter !== 'all') list = list.filter(s => s.type === stickerTypeFilter);
+  document.getElementById('stickerGrid').innerHTML = list.length ? list.map(s => `
+    <div class="a-asset-card">
+      <div class="img" style="background-image:url('${s.image_url}');background-size:contain;background-repeat:no-repeat;background-color:#fff;"></div>
+      <div class="meta"><div class="name">${escapeHtml(s.name)}</div><span class="a-badge gray">${STICKER_TYPE_LABELS[s.type] || s.type}</span></div>
+      <div class="row">
+        <div class="a-toggle ${s.enabled ? 'on' : ''}" onclick="toggleStickerEnabled('${s.id}', ${!s.enabled})"></div>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="deleteStickerAdmin('${s.id}')">🗑</button>
+      </div>
+    </div>`).join('') : `<div class="a-empty"><div class="ic">✨</div>No stickers yet.</div>`;
+}
+async function toggleStickerEnabled(id, value) {
+  const { error } = await sb.from('store_assets').update({ enabled: value }).eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  const s = STICKERS.find(s => s.id === id); if (s) s.enabled = value;
+  renderStickerGrid();
+}
+async function deleteStickerAdmin(id) {
+  if (!confirm('Delete this sticker from the library?')) return;
+  const { error } = await sb.from('store_assets').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  STICKERS = STICKERS.filter(s => s.id !== id);
+  renderStickerGrid();
+  showToast('Sticker deleted');
+}
+let stickerImgUrl = null;
+function openStickerModal() {
+  stickerImgUrl = null;
+  document.getElementById('stickerName').value = '';
+  document.getElementById('stickerType').value = 'sticker';
+  document.getElementById('stickerPreview').innerHTML = 'Tap to upload image';
+  openModal('stickerModal');
+}
+async function handleStickerUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    stickerImgUrl = await uploadFile('store-assets', file);
+    document.getElementById('stickerPreview').innerHTML = `<img src="${stickerImgUrl}" style="object-fit:contain;background:#fff;">`;
+  } catch (err) { showToast(err.message, true); }
+}
+async function saveSticker() {
+  const name = document.getElementById('stickerName').value.trim();
+  if (!name) { showToast('Enter a name', true); return; }
+  if (!stickerImgUrl) { showToast('Upload an image first', true); return; }
+  const payload = { name, type: document.getElementById('stickerType').value, image_url: stickerImgUrl, enabled: true, created_by: CURRENT_ADMIN.id };
+  const { data, error } = await sb.from('store_assets').insert(payload).select().single();
+  if (error) { showToast(error.message, true); return; }
+  STICKERS.unshift(data);
+  closeAllModals();
+  renderStickerGrid();
+  showToast('Sticker added');
+}
+
+// ============================================================
+// USERS
+// ============================================================
+function renderUsersTable() {
+  const q = (document.getElementById('userSearch').value || '').toLowerCase().trim();
+  let list = USERS;
+  if (q) list = list.filter(u => (u.shop_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  document.querySelector('#usersTable tbody').innerHTML = list.length ? list.map(u => `
+    <tr>
+      <td>${escapeHtml(u.shop_name || '—')}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="a-badge ${u.plan === 'free' ? 'gray' : 'green'}">${u.plan}</span></td>
+      <td>${u.plan_expires_at ? fmtDate(u.plan_expires_at) : '—'}</td>
+      <td>${u.suspended ? '<span class="a-badge red">Suspended</span>' : '<span class="a-badge green">Active</span>'}</td>
+      <td>${fmtDate(u.created_at)}</td>
+      <td style="white-space:nowrap;">
+        ${u.suspended
+          ? `<button class="a-btn a-btn-outline a-btn-sm" onclick="setUserSuspended('${u.id}', false)">Activate</button>`
+          : `<button class="a-btn a-btn-outline a-btn-sm" onclick="setUserSuspended('${u.id}', true)">Suspend</button>`}
+        <button class="a-btn a-btn-outline a-btn-sm" style="color:var(--a-coral-2);border-color:var(--a-coral-2);" onclick="deleteUserData('${u.id}')">Delete Data</button>
+      </td>
+    </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--a-muted);padding:24px;">No users found.</td></tr>`;
+}
+async function setUserSuspended(id, value) {
+  const { error } = await sb.from('profiles').update({ suspended: value }).eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  const u = USERS.find(u => u.id === id); if (u) u.suspended = value;
+  renderUsersTable();
+  showToast(value ? 'User suspended' : 'User re-activated');
+}
+async function deleteUserData(id) {
+  if (!confirm('This permanently deletes their posters, favorites, and profile data. Their login account itself must be removed separately from the Supabase Dashboard → Authentication (deleting an auth account requires the service_role key, which this client-side panel intentionally never holds). Continue deleting their data?')) return;
+  const { error } = await sb.from('profiles').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  USERS = USERS.filter(u => u.id !== id);
+  renderUsersTable();
+  showToast('User data deleted');
+}
+
+// ============================================================
+// PLANS
+// ============================================================
+function renderPlanPricingForm() {
+  document.getElementById('planPremiumPrice').value = SETTINGS.premium_price ?? 299;
+  document.getElementById('planBusinessPrice').value = SETTINGS.business_plan_price ?? 999;
+}
+async function savePlanPricing() {
+  const payload = {
+    premium_price: Number(document.getElementById('planPremiumPrice').value) || 0,
+    business_plan_price: Number(document.getElementById('planBusinessPrice').value) || 0
+  };
+  const { error } = await sb.from('settings').update(payload).eq('id', 1);
+  if (error) { showToast(error.message, true); return; }
+  Object.assign(SETTINGS, payload);
+  showToast('Pricing saved');
+}
+function renderPlanUserResults() {
+  const q = (document.getElementById('planUserSearch').value || '').toLowerCase().trim();
+  const box = document.getElementById('planUserResults');
+  if (!q) { box.innerHTML = ''; return; }
+  const matches = USERS.filter(u => (u.shop_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).slice(0, 6);
+  box.innerHTML = matches.map(u => `
+    <div class="a-panel" style="margin-bottom:10px;padding:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div><strong>${escapeHtml(u.shop_name || u.email)}</strong><div style="font-size:12px;color:var(--a-muted);">${escapeHtml(u.email)} · plan: ${u.plan}${u.plan_expires_at ? ' (expires ' + fmtDate(u.plan_expires_at) + ')' : ''}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="a-btn a-btn-gold a-btn-sm" onclick="activateUserPlan('${u.id}','premium',30)">Activate Premium (30d)</button>
+        <button class="a-btn a-btn-gold a-btn-sm" onclick="activateUserPlan('${u.id}','business',30)">Activate Business (30d)</button>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="extendUserPlan('${u.id}',30)">Extend +30 days</button>
+        <button class="a-btn a-btn-outline a-btn-sm" onclick="activateUserPlan('${u.id}','free',0)">Move to Free</button>
+      </div>
+    </div>`).join('') || `<p style="color:var(--a-muted);font-size:13px;">No matches.</p>`;
+}
+async function activateUserPlan(userId, plan, days) {
+  const payload = { plan };
+  if (plan === 'free') { payload.plan_expires_at = null; }
+  else { payload.plan_started_at = new Date().toISOString(); payload.plan_expires_at = new Date(Date.now() + days * 86400000).toISOString(); }
+  const { error } = await sb.from('profiles').update(payload).eq('id', userId);
+  if (error) { showToast(error.message, true); return; }
+  Object.assign(USERS.find(u => u.id === userId) || {}, payload);
+  renderPlanUserResults();
+  renderUsersTable();
+  showToast('Plan updated');
+}
+async function extendUserPlan(userId, days) {
+  const u = USERS.find(u => u.id === userId); if (!u) return;
+  const base = u.plan_expires_at && new Date(u.plan_expires_at) > new Date() ? new Date(u.plan_expires_at) : new Date();
+  const newExpiry = new Date(base.getTime() + days * 86400000).toISOString();
+  const { error } = await sb.from('profiles').update({ plan_expires_at: newExpiry }).eq('id', userId);
+  if (error) { showToast(error.message, true); return; }
+  u.plan_expires_at = newExpiry;
+  renderPlanUserResults();
+  renderUsersTable();
+  showToast('Plan extended by ' + days + ' days');
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+function renderPaymentStatusPills() {
+  const statuses = [{ id: 'pending', label: 'Pending' }, { id: 'approved', label: 'Approved' }, { id: 'rejected', label: 'Rejected' }, { id: 'all', label: 'All' }];
+  document.getElementById('paymentStatusPills').innerHTML = statuses.map(s => `
+    <div class="a-pill ${paymentStatusFilter === s.id ? 'active' : ''}" onclick="setPaymentStatusFilter('${s.id}')">${s.label}</div>`).join('');
+}
+function setPaymentStatusFilter(id) { paymentStatusFilter = id; renderPaymentStatusPills(); renderPaymentsTable(); }
+function renderPaymentsTable() {
+  renderPaymentStatusPills();
+  let list = PAYMENTS;
+  if (paymentStatusFilter !== 'all') list = list.filter(p => p.status === paymentStatusFilter);
+  document.querySelector('#paymentsTable tbody').innerHTML = list.length ? list.map(p => `
+    <tr>
+      <td>${escapeHtml(p.profiles?.shop_name || '—')}<div style="font-size:11px;color:var(--a-muted);">${escapeHtml(p.profiles?.email || '')}</div></td>
+      <td><span class="a-badge gold">${p.plan}</span></td>
+      <td>${fmtMoney(p.amount)}</td>
+      <td>${escapeHtml(p.upi_transaction_id || '—')}</td>
+      <td>${p.screenshot_url ? `<a href="${p.screenshot_url}" target="_blank">View</a>` : '—'}</td>
+      <td><span class="a-badge ${p.status === 'approved' ? 'green' : p.status === 'rejected' ? 'red' : 'gold'}">${p.status}</span></td>
+      <td>${fmtDate(p.created_at)}</td>
+      <td>${p.status === 'pending' ? `<button class="a-btn a-btn-outline a-btn-sm" onclick="openPaymentModal('${p.id}')">Review</button>` : '—'}</td>
+    </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--a-muted);padding:24px;">No payments here.</td></tr>`;
+}
+function openPaymentModal(id) {
+  const p = PAYMENTS.find(p => p.id === id); if (!p) return;
+  document.getElementById('paymentModalBody').innerHTML = `
+    <div class="a-field"><label>Shop</label><input type="text" value="${escapeHtml(p.profiles?.shop_name || '')}" disabled></div>
+    <div class="a-field"><label>Email</label><input type="text" value="${escapeHtml(p.profiles?.email || '')}" disabled></div>
+    <div class="a-grid-2">
+      <div class="a-field"><label>Plan</label><input type="text" value="${p.plan}" disabled></div>
+      <div class="a-field"><label>Amount</label><input type="text" value="${fmtMoney(p.amount)}" disabled></div>
+    </div>]
+    <div class="a-field"><label>Transaction ID</label><input type="text" value="${escapeHtml(p.upi_transaction_id || '—')}" disabled></div>
+    ${p.screenshot_url ? `<div class="a-field"><label>Screenshot</label><img src="${p.screenshot_url}" style="width:100%;border-radius:10px;border:1px solid var(--a-line);"></div>` : ''}
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="a-btn a-btn-primary a-btn-block" onclick="approvePayment('${p.id}')">✅ Approve & Activate</button>
+      <button class="a-btn a-btn-outline a-btn-block" style="color:var(--a-coral-2);border-color:var(--a-coral-2);" onclick="rejectPayment('${p.id}')">✕ Reject</button>
+    </div>`;
+  openModal('paymentModal');
+}
+async function approvePayment(id) {
+  const p = PAYMENTS.find(p => p.id === id); if (!p) return;
+  const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+  const { error: e1 } = await sb.from('payments').update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: CURRENT_ADMIN.id }).eq('id', id);
+  if (e1) { showToast(e1.message, true); return; }
+  const { error: e2 } = await sb.from('profiles').update({ plan: p.plan, plan_started_at: new Date().toISOString(), plan_expires_at: expiresAt }).eq('id', p.user_id);
+  if (e2) { showToast(e2.message, true); return; }
+  p.status = 'approved';
+  const u = USERS.find(u => u.id === p.user_id); if (u) { u.plan = p.plan; u.plan_expires_at = expiresAt; }
+  closeAllModals();
+  renderPaymentsTable(); renderDashboard(); renderUsersTable();
+  showToast('Payment approved — plan activated for 30 days');
+}
+async function rejectPayment(id) {
+  const { error } = await sb.from('payments').update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: CURRENT_ADMIN.id }).eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  const p = PAYMENTS.find(p => p.id === id); if (p) p.status = 'rejected';
+  closeAllModals();
+  renderPaymentsTable(); renderDashboard();
+  showToast('Payment rejected');
+}
+async function loadPayments() {
+  const { data, error } = await sb
+    .from('payments')
+    .select('*, profiles(shop_name, email)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error loading payments:', error.message);
+    return;
+  }
+
+  window.PAYMENTS = data || [];
+  if (typeof renderPaymentTable === 'function') {
+    renderPaymentTable();
+  }
+}
+// ============================================================
+// POSTERS
+// ============================================================
+function renderPostersTable() {
+  document.querySelector('#postersTable tbody').innerHTML = POSTERS.length ? POSTERS.map(p => `
+    <tr>
+      <td>${p.thumb_url ? `<img class="thumb-sq" src="${p.thumb_url}">` : '—'}</td>
+      <td>${escapeHtml(p.title || 'Untitled')}</td>
+      <td>${escapeHtml(p.profiles?.shop_name || p.profiles?.email || '—')}</td>
+      <td><span class="a-badge ${p.type === 'draft' ? 'gray' : 'green'}">${p.type}</span></td>
+      <td>${fmtDate(p.updated_at)}</td>
+      <td><button class="a-btn a-btn-outline a-btn-sm" style="color:var(--a-coral-2);border-color:var(--a-coral-2);" onclick="deletePosterAdmin('${p.id}')">Delete</button></td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--a-muted);padding:24px;">No saved posters yet.</td></tr>`;
+}
+async function deletePosterAdmin(id) {
+  if (!confirm('Delete this poster?')) return;
+  const { error } = await sb.from('posters').delete().eq('id', id);
+  if (error) { showToast(error.message, true); return; }
+  POSTERS = POSTERS.filter(p => p.id !== id);
+  renderPostersTable();
+  showToast('Poster deleted');
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+async function renderAnalytics() {
+  const { data: logs } = await sb.from('downloads_log').select('created_at, template_id').order('created_at', { ascending: false }).limit(2000);
+  const byDay = {};
+  const byMonth = {};
+  (logs || []).forEach(l => {
+    const d = new Date(l.created_at);
+    const dayKey = d.toISOString().slice(0, 10);
+    const monthKey = d.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+    byDay[dayKey] = (byDay[dayKey] || 0) + 1;
+    byMonth[monthKey] = (byMonth[monthKey] || 0) + 1;
+  });
+  const last14 = [...Array(14)].map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  const dailyMax = Math.max(1, ...last14.map(d => byDay[d] || 0));
+  document.getElementById('dailyDownloadsChart').innerHTML = last14.map(d => `
+    <div class="a-bar-row"><span class="lbl">${d.slice(5)}</span>
+      <div class="a-bar-track"><div class="a-bar-fill" style="width:${((byDay[d] || 0) / dailyMax) * 100}%"></div></div>
+      <span class="val">${byDay[d] || 0}</span></div>`).join('');
+
+  const monthKeys = Object.keys(byMonth).slice(0, 6);
+  const monthMax = Math.max(1, ...monthKeys.map(m => byMonth[m]));
+  document.getElementById('monthlyDownloadsChart').innerHTML = monthKeys.length ? monthKeys.map(m => `
+    <div class="a-bar-row"><span class="lbl">${m}</span>
+      <div class="a-bar-track"><div class="a-bar-fill" style="width:${(byMonth[m] / monthMax) * 100}%"></div></div>
+      <span class="val">${byMonth[m]}</span></div>`).join('') : `<p style="color:var(--a-muted);font-size:13px;">No download history yet.</p>`;
+
+  const top = [...TEMPLATES].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, 8);
+  const topMax = Math.max(1, ...top.map(t => t.downloads || 0));
+  document.getElementById('popularTemplatesChart').innerHTML = top.length ? top.map(t => `
+    <div class="a-bar-row"><span class="lbl" style="width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(t.title)}</span>
+      <div class="a-bar-track"><div class="a-bar-fill" style="width:${((t.downloads || 0) / topMax) * 100}%"></div></div>
+      <span class="val">${t.downloads || 0}</span></div>`).join('') : `<p style="color:var(--a-muted);font-size:13px;">No templates yet.</p>`;
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+let qrImageUrl = null;
+function renderSettingsForm() {
+  qrImageUrl = SETTINGS.qr_image_url || null;
+  document.getElementById('settingsUpiId').value = SETTINGS.upi_id || '';
+  document.getElementById('settingsWhatsapp').value = SETTINGS.whatsapp_number || '';
+  document.getElementById('settingsBusinessName').value = SETTINGS.business_name || '';
+  document.getElementById('settingsSupportEmail').value = SETTINGS.support_email || '';
+  document.getElementById('settingsWatermark').value = SETTINGS.watermark_text || '';
+  document.getElementById('settingsFreeLimit').value = SETTINGS.free_download_limit ?? 1;
+  document.getElementById('qrPreview').innerHTML = qrImageUrl ? `<img src="${qrImageUrl}">` : 'Tap to upload QR image';
+  renderPlanPricingForm();
+}
+async function handleQrUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    qrImageUrl = await uploadFile('store-assets', file);
+    document.getElementById('qrPreview').innerHTML = `<img src="${qrImageUrl}">`;
+  } catch (err) { showToast(err.message, true); }
+}
+async function saveAllSettings() {
+  const payload = {
+    upi_id: document.getElementById('settingsUpiId').value.trim(),
+    whatsapp_number: document.getElementById('settingsWhatsapp').value.trim(),
+    business_name: document.getElementById('settingsBusinessName').value.trim(),
+    support_email: document.getElementById('settingsSupportEmail').value.trim(),
+    watermark_text: document.getElementById('settingsWatermark').value.trim(),
+    free_download_limit: Number(document.getElementById('settingsFreeLimit').value) || 0,
+    qr_image_url: qrImageUrl,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('settings').update(payload).eq('id', 1);
+  if (error) { showToast(error.message, true); return; }
+  Object.assign(SETTINGS, payload);
+  showToast('Settings saved');
+}
+
+// ============================================================
+// Wire up table/grid renders that need initial data before first paint
+// ============================================================
+const _origShowSection = showSection;
+showSection = function (name) {
+  _origShowSection(name);
+  if (name === 'templates') renderTemplatesTable();
+  if (name === 'banners') renderBannerGrid();
+  if (name === 'products') renderProductGrid();
+  if (name === 'stickers') renderStickerGrid();
+  if (name === 'users') renderUsersTable();
+  if (name === 'plans') { renderPlanPricingForm(); document.getElementById('planUserResults').innerHTML = ''; document.getElementById('planUserSearch').value = ''; }
+  if (name === 'payments') renderPaymentsTable();
+  if (name === 'posters') renderPostersTable();
+};
+
+document.addEventListener('DOMContentLoaded', boot);
+
+</script>
+</body>
+</html>
