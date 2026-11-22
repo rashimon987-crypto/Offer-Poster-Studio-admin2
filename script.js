@@ -154,6 +154,7 @@ async function boot() {
     await authSignOut(); showAuth(); return;
   }
   STATE.user = user; STATE.profile = profile;
+  expireLocalPlan();
   await loadSharedData();
   enterApp();
 }
@@ -613,6 +614,25 @@ async function toggleFavorite(templateId) {
   if (STATE.currentScreen === 'dashboard') renderDashboard();
 }
 
+// A plan ends when plan_expires_at passes: drop to Free (server expire_plans does the same on the next load) and tell the user.
+function expireLocalPlan() {
+  const p = STATE.profile; if (!p || !p.plan_expires_at) return;
+  const ms = new Date(p.plan_expires_at) - new Date();
+  if (p.plan !== 'free' && ms <= 0) {
+    p.plan = 'free';
+    try { sb.from('profiles').update({ plan: 'free' }).eq('id', STATE.user.id).then(() => { }); } catch (e) { /* ignore */ }
+    toast('Your plan has expired — you are on the Free plan now. Renew to continue.', true);
+  } else if (p.plan !== 'free' && ms < 3 * 86400000) {
+    toast('⏰ Your plan expires in ' + Math.max(1, Math.ceil(ms / 86400000)) + ' day(s) — renew to keep unlimited access.', true);
+  }
+}
+function planNoticeHtml() { // banner text for the dashboard
+  const p = STATE.profile; if (!p || !p.plan_expires_at) return '';
+  const ms = new Date(p.plan_expires_at) - new Date(), d = Math.ceil(ms / 86400000);
+  if (p.plan === 'free' && ms <= 0) return '❌ Your plan expired on ' + fmtDate(p.plan_expires_at) + '. You are on the Free plan (1 download + 1 save). Renew to continue.';
+  if (p.plan !== 'free' && ms > 0 && d <= 7) return '⏰ Your plan expires in ' + d + ' day' + (d === 1 ? '' : 's') + ' (' + fmtDate(p.plan_expires_at) + '). Renew now so you do not lose access.';
+  return '';
+}
 function planDaysRemaining() {
   if (!STATE.profile.plan_expires_at) return null;
   const diff = new Date(STATE.profile.plan_expires_at) - new Date();
@@ -625,7 +645,10 @@ async function renderDashboard() {
   document.getElementById('planName').textContent = STATE.profile.plan === 'free' ? 'Free Plan' : (STATE.profile.plan === 'premium' ? 'Premium Plan ✨' : 'Business Plan 💼');
   const days = planDaysRemaining();
   document.getElementById('planDaysLeft').textContent = days !== null ? days + ' days left' : '';
-  document.getElementById('planExpiryRow').textContent = STATE.profile.plan_expires_at ? 'Expires ' + fmtDate(STATE.profile.plan_expires_at) : 'No active subscription';
+  document.getElementById('planExpiryRow').textContent = STATE.profile.plan_expires_at ? (STATE.profile.plan === 'free' ? 'Expired ' : 'Expires ') + fmtDate(STATE.profile.plan_expires_at) : 'No active subscription';
+  { let nb = document.getElementById('planNotice'); const msg = planNoticeHtml(); const row = document.getElementById('planExpiryRow').parentElement;
+    if (!nb && row) { nb = document.createElement('div'); nb.id = 'planNotice'; nb.style.cssText = 'margin-top:10px;padding:10px 12px;border-radius:10px;background:#FEF3C7;color:#92400E;font-weight:700;font-size:13px;line-height:1.4'; row.parentElement.insertBefore(nb, row.nextSibling); }
+    if (nb) { nb.textContent = msg; nb.style.display = msg ? 'block' : 'none'; } }
   quotaRemaining('image').then(n => { if (n !== null) document.getElementById('planExpiryRow').textContent += ' · ' + n + ' downloads left'; }).catch(() => { });
   document.getElementById('planUpgradeBtn').style.display = STATE.profile.plan === 'business' ? 'none' : 'inline-flex';
 
@@ -751,7 +774,10 @@ function payWithRazorpay() {
     // usually what fixes UPI not appearing. It still only works if UPI is enabled for your
     // account in the Razorpay Dashboard (Settings → Payment Methods) — see the note below.
     method: { netbanking: true, card: true, upi: true, wallet: true },
-    handler: (response) => activatePlanAfterPayment(plan, response.razorpay_payment_id),
+    notes: { user_id: STATE.user?.id || '', plan_id: plan.id },
+    // With the server webhook enabled (Admin → Pricing & Limits), the plan is activated by the server after Razorpay confirms
+    // the money; the browser only waits for it. Otherwise (webhook not set up) fall back to browser-side activation.
+    handler: (response) => (STATE.settings && STATE.settings.razorpay_webhook_on) ? waitForServerActivation(plan, response.razorpay_payment_id) : activatePlanAfterPayment(plan, response.razorpay_payment_id),
     modal: { ondismiss: () => toast('Payment cancelled') }
   });
   rzp.on('payment.failed', (response) => toast('Payment failed: ' + (response.error?.description || 'please try again') + (/^rzp_test_/.test(rzpKey) ? ' (Test mode: use test card 4111 1111 1111 1111 or UPI success@razorpay)' : ''), true));
@@ -772,6 +798,17 @@ async function quotaRemaining(kind) { // number left, or null when unlimited / f
   const { count } = await q; return Math.max(0, lim - (count || 0));
 }
 async function planQuotaExceeded(kind) { const r = await quotaRemaining(kind); return r !== null && r <= 0; }
+async function waitForServerActivation(plan, paymentId) {
+  toast('Payment received — activating your plan…');
+  for (let i = 0; i < 20; i++) { // up to ~40 s for the webhook to arrive
+    await new Promise(r => setTimeout(r, 2000));
+    const { data } = await sb.from('profiles').select('*').eq('id', STATE.user.id).single();
+    if (data && data.plan && data.plan !== 'free' && (!STATE.profile.plan_expires_at || data.plan_expires_at !== STATE.profile.plan_expires_at)) {
+      Object.assign(STATE.profile, data); toast(`Payment successful! ${plan.label} plan activated.`); goto('dashboard'); return;
+    }
+  }
+  toast('Payment received. Your plan will activate in a moment — refresh the page. If it does not, contact support with payment ID ' + paymentId, true);
+}
 async function activatePlanAfterPayment(plan, paymentId) {
   try {
     const now = new Date();
@@ -6039,7 +6076,7 @@ create policy "admin graphics" on store_assets for all using (is_studio_admin())
 // VIDEO MAKER (separate module, no AI). Photo/video slideshow with text overlays, simple
 // animations, transitions and background music, rendered on a <canvas> and recorded in the
 // browser with MediaRecorder. Output format depends on the browser: MP4 where the browser can
-// record it (Safari, recent Chrome), otherwise WebM. Clip audio is not mixed (music track only).
+// record it (Safari, recent Chrome), otherwise WebM. Clip audio is not mixed (music track only). Colours / backgrounds are user-overridable per style.
 // Runs entirely client-side; export happens in real time (a 20 s video takes ~20 s).
 // ===================================================================================
 var VideoMaker = (() => {
@@ -6075,11 +6112,24 @@ var VideoMaker = (() => {
   const fontOf = () => (S.lang !== 'en' && StudioTpl.LF[S.lang] ? StudioTpl.LF[S.lang] + ',' : '') + "'Anton','Baloo Chettan 2','Noto Sans Malayalam',sans-serif";
   let S = null, raf = 0, playing = false, t0 = 0, recorder = null;
 
-  const fresh = () => ({ ratio: '9:16', trans: 'fade', theme: 'offer', lang: 'en', slides: [], music: null, vol: 0.8, brand: '', cur: 0, loop: false });
+  const fresh = () => ({ ratio: '9:16', trans: 'fade', theme: 'offer', lang: 'en', slides: [], music: null, ov: {}, bgImg: null, vol: 0.8, brand: '', cur: 0, loop: false });
   const total = () => S.slides.reduce((a, s) => a + s.dur, 0);
   const dims = () => RATIOS[S.ratio];
   const plan = () => (window.STATE && STATE.profile && STATE.profile.plan) || 'free';
   const FREE_MAX_SEC = 20;
+  // Background presets: [name, colour 1, colour 2, text colour, accent]
+  const BG_PRESETS = [
+    ['Ivory & gold', '#FBF6EA', '#F3E3C3', '#3B2A10', '#B8860B'], ['Royal maroon', '#4A0E1B', '#9B1C31', '#FBF6EA', '#E8C468'], ['Blush rose', '#FDE2E4', '#F8B4C0', '#5B1A2B', '#B76E79'],
+    ['Temple gold', '#7A4A00', '#E0A526', '#FFFFFF', '#FFF2B3'], ['Emerald', '#064E3B', '#10B981', '#FFFFFF', '#FDE68A'], ['Midnight navy', '#0B1B3A', '#1E3A8A', '#FFFFFF', '#FACC15'],
+    ['Sunset', '#7C2D12', '#F59E0B', '#FFFFFF', '#FEF08A'], ['Royal purple', '#2E1065', '#7C3AED', '#FFFFFF', '#FDE68A'], ['Ocean', '#0369A1', '#22D3EE', '#FFFFFF', '#FEF08A'],
+    ['Peach cream', '#FFF1E6', '#FFD6BA', '#5A2A0C', '#C2410C'], ['Mint fresh', '#ECFDF5', '#A7F3D0', '#064E3B', '#047857'], ['Pure black', '#000000', '#1F1F1F', '#FFFFFF', '#FACC15'],
+    ['Pure white', '#FFFFFF', '#F1F5F9', '#0F172A', '#0E6E5D'], ['Hot pink', '#BE185D', '#FB7185', '#FFFFFF', '#FEF08A'], ['Fire red', '#7F1D1D', '#EF4444', '#FFFFFF', '#FDE047'], ['Teal', '#0E6E5D', '#14B8A6', '#FFFFFF', '#CC9A3C']
+  ];
+  const DECOS = [['', 'Style default'], ['rays', 'Rays'], ['stripes', 'Stripes'], ['dots', 'Dots'], ['sparkle', 'Sparkles'], ['frame', 'Gold frame'], ['neon', 'Neon frame'], ['circles', 'Circles'], ['none', 'Plain']];
+  const eff = () => Object.assign({}, THEMES[S.theme], S.ov || {});
+  const lum = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); if (!m) return 1; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const isLight = h => lum(h) > 0.6;   // true = light text colour
+  const hex6 = h => /^#[0-9a-f]{6}$/i.test(h) ? h : '#ffffff';
 
   function open() {
     if (!S) S = fresh();
@@ -6091,10 +6141,20 @@ var VideoMaker = (() => {
           <p class="studio-hint" id="vmInfo"></p></div>
         <div style="flex:1;min-width:220px" class="studio-form">
           <label class="studio-label">Style (${Object.keys(THEMES).length} styles)</label><select id="vmTheme" onchange="VideoMaker.setTheme(this.value)">${Object.entries(THEMES).map(([k, t]) => `<option value="${k}" ${S.theme === k ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
+          <label class="studio-label">Background look (all styles incl. Wedding)</label><select onchange="VideoMaker.setPreset(this.value)"><option value="">Style default</option>${BG_PRESETS.map((p, i) => `<option value="${i}">${p[0]}</option>`).join('')}</select>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0">
+            <label class="studio-hint">Bg 1 <input type="color" id="vmC0" value="${hex6(eff().bg[0])}" oninput="VideoMaker.setOv('c0',this.value)"></label>
+            <label class="studio-hint">Bg 2 <input type="color" id="vmC1" value="${hex6(eff().bg[1])}" oninput="VideoMaker.setOv('c1',this.value)"></label>
+            <label class="studio-hint">Text <input type="color" id="vmCT" value="${hex6(eff().text)}" oninput="VideoMaker.setOv('text',this.value)"></label>
+            <label class="studio-hint">Accent <input type="color" id="vmCA" value="${hex6(eff().accent)}" oninput="VideoMaker.setOv('accent',this.value)"></label>
+            <button class="btn btn-outline btn-sm" onclick="VideoMaker.resetOv()">Reset</button></div>
+          <label class="studio-label">Decoration</label><select onchange="VideoMaker.setOv('deco',this.value)">${DECOS.map(d => `<option value="${d[0]}" ${(S.ov.deco || '') === d[0] ? 'selected' : ''}>${d[1]}</option>`).join('')}</select>
+          <label class="studio-label">Background photo (optional, for text slides)</label><input type="file" accept="image/*" onchange="VideoMaker.setBgImage(this)"><div class="studio-hint">${S.bgImg ? 'Photo set — <a href="#" onclick="VideoMaker.clearBgImage();return false">remove</a>' : 'None'}</div>
           <label class="studio-label">Language of sample text</label><select onchange="VideoMaker.setLang(this.value)">${Object.entries(LANG_LABEL).map(([k, l]) => `<option value="${k}" ${S.lang === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
           <label class="studio-label">Transition</label><select onchange="VideoMaker.setTrans(this.value)">${TRANS.map(t => `<option value="${t[0]}" ${S.trans === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select>
           <label class="studio-label">Brand / watermark text (optional)</label><input type="text" value="${esc(S.brand)}" oninput="VideoMaker.setBrand(this.value)" placeholder="Your shop name">
           <label class="studio-label">Music (optional)</label><input type="file" accept="audio/*" onchange="VideoMaker.setMusic(this)"><div id="vmMusic" class="studio-hint">${S.music ? esc(S.music.name) : 'No music'}</div>
+          <label class="studio-hint">Music volume <input type="range" min="0" max="1" step="0.05" value="${S.vol}" oninput="VideoMaker.setVol(this.value)"></label>
           <label class="studio-label">Add photos / video clips</label><input type="file" accept="image/*,video/*" multiple onchange="VideoMaker.addFiles(this)">
           <div class="studio-actions"><button class="btn btn-outline btn-sm" onclick="VideoMaker.addTextSlide()">＋ Text slide</button><button class="btn btn-outline btn-sm" onclick="VideoMaker.fromTheme()">Fill text slides from style</button></div>
         </div></div>
@@ -6110,7 +6170,18 @@ var VideoMaker = (() => {
   function setRatio(r) { stop(); S.ratio = r; open(); }
   function setTrans(v) { S.trans = v; }
   function setBrand(v) { S.brand = v; }
-  function setTheme(v) { S.theme = v; if (S.slides.every(x => x.type === 'text')) fromTheme(); else draw(0); }
+  function setTheme(v) { S.theme = v; S.ov = {}; refreshColors(); if (S.slides.every(x => x.type === 'text')) fromTheme(); else draw(0); }
+  function refreshColors() { const e = eff(), set = (id, v) => { const el = document.getElementById(id); if (el) el.value = hex6(v); }; set('vmC0', e.bg[0]); set('vmC1', e.bg[1]); set('vmCT', e.text); set('vmCA', e.accent); }
+  function setOv(k, v) {
+    if (k === 'c0') S.ov.bg = [v, eff().bg[1]]; else if (k === 'c1') S.ov.bg = [eff().bg[0], v];
+    else if (v === '') delete S.ov[k]; else S.ov[k] = v;
+    draw(S.slides.length ? startOf(S.cur) + 0.9 : 0);
+  }
+  function setPreset(i) { if (i === '') { delete S.ov.bg; delete S.ov.text; delete S.ov.accent; } else { const p = BG_PRESETS[+i]; S.ov.bg = [p[1], p[2]]; S.ov.text = p[3]; S.ov.accent = p[4]; } refreshColors(); draw(startOf(S.cur) + 0.9); }
+  function resetOv() { S.ov = {}; S.bgImg = null; open(); }
+  function setBgImage(input) { const f = input.files && input.files[0]; if (!f) return; const im = new Image(); im.onload = () => { S.bgImg = im; open(); }; im.src = URL.createObjectURL(f); }
+  function clearBgImage() { S.bgImg = null; open(); }
+  function setVol(v) { S.vol = parseFloat(v); if (S.music && S.music.el) S.music.el.volume = S.vol; }
   function setLang(v) { S.lang = v; if (S.slides.every(x => x.type === 'text')) fromTheme(); else draw(0); }
 
   // ------------------------------------------------------------------ slides
@@ -6139,7 +6210,7 @@ var VideoMaker = (() => {
   function setMusic(input) {
     const f = input.files && input.files[0]; if (!f) return;
     const a = new Audio(URL.createObjectURL(f)); a.loop = true; a.crossOrigin = 'anonymous';
-    S.music = { name: f.name, el: a }; document.getElementById('vmMusic').textContent = f.name;
+    S.music = { name: f.name, el: a, file: f }; document.getElementById('vmMusic').textContent = f.name;
   }
   function renderSlides() {
     const box = document.getElementById('vmSlides'); if (!box) return;
@@ -6147,6 +6218,7 @@ var VideoMaker = (() => {
       <div style="width:44px;height:44px;border-radius:8px;background:#222;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">${s.type === 'image' ? `<img src="${s.src}" style="width:100%;height:100%;object-fit:cover">` : s.type === 'video' ? '🎞️' : 'T'}</div>
       <input type="text" style="flex:1;min-width:110px;padding:7px;border:1.5px solid var(--line);border-radius:8px;font-size:12.5px" placeholder="Text on this slide" value="${esc(s.text)}" oninput="VideoMaker.upd(${i},'text',this.value)">
       <select style="padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'anim',this.value)">${ANIMS.map(a => `<option value="${a[0]}" ${s.anim === a[0] ? 'selected' : ''}>${a[1]}</option>`).join('')}</select>
+      <input type="color" value="${hex6(s.tc || (s.type === 'text' ? eff().text : '#ffffff'))}" title="Text colour of this slide" style="width:34px;height:30px;padding:0;border:1.5px solid var(--line);border-radius:8px" oninput="VideoMaker.upd(${i},'tc',this.value)">
       <select style="padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'pos',this.value)">${['top', 'center', 'bottom'].map(p => `<option ${s.pos === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
       <input type="number" min="1" max="15" step="0.5" value="${s.dur}" style="width:58px;padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'dur',parseFloat(this.value)||3)" title="Seconds">
       <button class="icon-btn" onclick="VideoMaker.move(${i},-1)">↑</button><button class="icon-btn" onclick="VideoMaker.move(${i},1)">↓</button><button class="icon-btn" onclick="VideoMaker.del(${i})">🗑</button></div>`).join('') || '<p class="studio-empty-hint">Add photos, clips or text slides.</p>';
@@ -6167,8 +6239,9 @@ var VideoMaker = (() => {
     const s = Math.max(W / iw, H / ih) * zoom, w = iw * s, h = ih * s; ctx.drawImage(el, (W - w) / 2 + ox, (H - h) / 2 + oy, w, h);
   }
   function deco(ctx, th, W, H, t) {
-    const u = Math.min(W, H), dark = th.text !== '#ffffff' && th.text !== '#FBF6EA' ? 0.1 : 0.12; ctx.save();
-    const lightFill = th.text === '#ffffff' || th.text === '#FBF6EA' ? 'rgba(255,255,255,' : 'rgba(0,0,0,';
+    const u = Math.min(W, H), dark = isLight(th.text) ? 0.12 : 0.1; ctx.save();
+    const lightFill = isLight(th.text) ? 'rgba(255,255,255,' : 'rgba(0,0,0,';
+    if (th.deco === 'none') { ctx.restore(); return; }
     if (th.deco === 'rays') { ctx.translate(W / 2, H * 0.45); ctx.rotate(t * 0.15); ctx.fillStyle = lightFill + '0.10)'; for (let i = 0; i < 24; i += 2) { const a1 = i / 24 * 6.2832, a2 = (i + 1) / 24 * 6.2832, R = Math.hypot(W, H); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); ctx.lineTo(Math.cos(a2) * R, Math.sin(a2) * R); ctx.fill(); } }
     else if (th.deco === 'stripes') { ctx.fillStyle = lightFill + '0.07)'; ctx.translate(0, 0); const off = (t * 40) % (u * 0.2); for (let x = -H; x < W + H; x += u * 0.2) { ctx.save(); ctx.translate(x + off, 0); ctx.rotate(0.45); ctx.fillRect(0, -H, u * 0.08, H * 3); ctx.restore(); } }
     else if (th.deco === 'dots') { ctx.fillStyle = lightFill + '0.12)'; for (let i = 0; i < 26; i++) { const x = ((i * 137.5) % 100) / 100 * W, y = (((i * 61.8) + t * 12) % 100) / 100 * H; ctx.beginPath(); ctx.arc(x, y, u * (0.01 + (i % 4) * 0.008), 0, 7); ctx.fill(); } }
@@ -6179,7 +6252,7 @@ var VideoMaker = (() => {
     ctx.restore();
   }
   function drawSlide(ctx, s, lt, W, H, tr) { // lt = local time; tr = {kind, p, dir} for the incoming slide
-    const th = THEMES[S.theme], u = Math.min(W, H);
+    const th = eff(), u = Math.min(W, H);
     ctx.save();
     if (tr) {
       if (tr.kind === 'fade') ctx.globalAlpha = tr.p;
@@ -6190,7 +6263,7 @@ var VideoMaker = (() => {
     const kb = 1 + 0.08 * Math.min(1, lt / Math.max(0.5, s.dur)); // slow Ken-Burns zoom
     if (s.type === 'image') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); drawCover(ctx, s.el, W, H, kb, 0, 0); }
     else if (s.type === 'video') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); drawCover(ctx, s.el, W, H, 1, 0, 0); }
-    else { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); deco(ctx, th, W, H, lt); }
+    else { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); if (S.bgImg) { drawCover(ctx, S.bgImg, W, H, kb, 0, 0); ctx.fillStyle = isLight(th.text) ? 'rgba(0,0,0,.38)' : 'rgba(255,255,255,.45)'; ctx.fillRect(0, 0, W, H); } deco(ctx, th, W, H, lt); }
     if (s.text) {
       if (s.type !== 'text') { const gr = ctx.createLinearGradient(0, H * 0.5, 0, H); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.55)'); ctx.fillStyle = gr; ctx.fillRect(0, H * 0.5, W, H * 0.5); }
       const p = ease(lt / 0.7); let txt = s.text, alpha = 1, dy = 0, dx = 0, sc = 1;
@@ -6198,8 +6271,8 @@ var VideoMaker = (() => {
       const size = Math.round(u * (s.type === 'text' ? 0.085 : 0.06)); ctx.font = `800 ${size}px ${fontOf()}`;
       const lines = wrap(ctx, txt, W * 0.84), lh = size * 1.18, bh = lines.length * lh, cy = s.pos === 'top' ? H * 0.18 : s.pos === 'center' ? H * 0.5 : H * 0.82 - bh / 2;
       ctx.globalAlpha *= alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.translate(W / 2 + dx, cy + dy); ctx.scale(sc, sc);
-      const light = s.type !== 'text' || th.text === '#ffffff';
-      ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.14; ctx.strokeStyle = light ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.7)'; ctx.fillStyle = s.type === 'text' ? th.text : '#ffffff';
+      const tcol = s.tc || (s.type === 'text' ? th.text : '#ffffff'), light = isLight(tcol);
+      ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.14; ctx.strokeStyle = light ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.7)'; ctx.fillStyle = tcol;
       lines.forEach((l, k) => { const y = (k - (lines.length - 1) / 2) * lh; ctx.strokeText(l, 0, y); ctx.fillText(l, 0, y); });
     }
     ctx.restore();
@@ -6259,28 +6332,36 @@ var VideoMaker = (() => {
   }
   async function exportVideo() {
     if (!S.slides.length) return toast('Add some slides first', true);
+    let actxEarly = null; if (S.music && S.music.file) { try { actxEarly = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* ignore */ } }
     const c = document.getElementById('vmCanvas'), mime = pickMime();
     if (!c.captureStream || !mime) return toast('This browser cannot record video. Try Chrome or Safari.', true);
     if (total() > FREE_MAX_SEC && plan() === 'free') toast(`Free plan exports the first ${FREE_MAX_SEC} seconds — upgrade for full length`);
-    if (window.StudioStore) { const gate = { format: 'video', multiplier: 1, transparent: false, print: false }; if (!(await StudioStore.beforeExport(gate))) return; }
+    if (window.StudioStore) { const gate = { format: 'video', multiplier: 1, transparent: false, print: false }; if (!(await StudioStore.beforeExport(gate))) { if (actxEarly) try { actxEarly.close(); } catch (e) { /* ignore */ } return; } }
     stop();
-    const stream = c.captureStream(30); let actx = null;
-    if (S.music) {
-      try { actx = new (window.AudioContext || window.webkitAudioContext)(); const src = actx.createMediaElementSource(S.music.el), dst = actx.createMediaStreamDestination(), gain = actx.createGain(); gain.gain.value = S.vol; src.connect(gain); gain.connect(dst); gain.connect(actx.destination); gain.disconnect(actx.destination); dst.stream.getAudioTracks().forEach(t => stream.addTrack(t)); S.music.el.currentTime = 0; await S.music.el.play(); } catch (e) { console.warn('music not captured', e); }
+    const stream = c.captureStream(30); let actx = null, srcNode = null;
+    if (S.music && S.music.file) {
+      // Decode the file and feed it to the recorder through a fresh buffer source (reliable; no element re-routing).
+      try {
+        actx = actxEarly || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') await actx.resume();
+        const buf = await actx.decodeAudioData(await S.music.file.arrayBuffer());
+        const dst = actx.createMediaStreamDestination(), gain = actx.createGain(); gain.gain.value = S.vol;
+        srcNode = actx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; srcNode.connect(gain); gain.connect(dst);
+        const tracks = dst.stream.getAudioTracks(); if (!tracks.length) throw new Error('no audio track'); tracks.forEach(tk => stream.addTrack(tk));
+      } catch (e) { console.warn('music not captured', e); srcNode = null; toast('Could not read this music file — exporting without music (try an MP3 or M4A)', true); }
     }
     const chunks = []; recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 });
     recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
     const done = new Promise(r => { recorder.onstop = r; });
-    toast('Recording… keep this window open'); recorder.start(250);
+    toast('Recording… keep this window open'); recorder.start(250); if (srcNode) { try { srcNode.start(0); } catch (e) { /* ignore */ } }
     play(() => { setTimeout(() => recorder.state !== 'inactive' && recorder.stop(), 300); }, true);
     await done;
-    if (S.music) S.music.el.pause(); if (actx) { try { actx.close(); } catch (e) { /* ignore */ } S.music && (S.music.el = S.music.el); }
+    if (srcNode) { try { srcNode.stop(); } catch (e) { /* ignore */ } } if (actx) { try { actx.close(); } catch (e) { /* ignore */ } }
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] }), url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `video_${Date.now()}.${ext}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
     if (window.StudioStore) StudioStore.afterExport({ format: 'video', multiplier: 1, name: 'Video', w: c.width, h: c.height });
     toast(ext === 'mp4' ? 'Video exported (MP4)' : 'Video exported as WebM (this browser cannot record MP4)');
   }
 
-  return { open, close, setRatio, setTrans, setBrand, setTheme, setLang, setMusic, addFiles, addTextSlide, fromTheme, upd, move, del, togglePlay, exportVideo, THEMES, pickMime };
+  return { setOv, setPreset, resetOv, setBgImage, clearBgImage, setVol, open, close, setRatio, setTrans, setBrand, setTheme, setLang, setMusic, addFiles, addTextSlide, fromTheme, upd, move, del, togglePlay, exportVideo, THEMES, pickMime };
 })();
 
