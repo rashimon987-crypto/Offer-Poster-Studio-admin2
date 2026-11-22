@@ -31,6 +31,8 @@ img.th{width:46px;height:46px;object-fit:cover;border-radius:8px;background:#eee
 pre{white-space:pre-wrap;background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;max-height:340px;overflow:auto}
 </style></head><body>
 <div id="app"></div><div id="toast"></div>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 const SUPABASE_URL='https://peftmuasykbcrhtkhhjf.supabase.co', SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZnRtdWFzeWtiY3JodGtoaGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3MzkzMTIsImV4cCI6MjEwMTMxNTMxMn0.oiFn_41F-jBxK8tizA3qPoC1UPJPC72SvNxyxiUlhGY';
@@ -115,7 +117,21 @@ async templates(){
 
 async studiot(){
   const r=await sb.from('studio_templates').select('id,name,cat,premium,tags,thumb,created_at').order('created_at',{ascending:false});if(r.error)throw r.error;
-  paint(`<div class="card"><h2>Design Studio templates (${r.data.length})</h2><div class="card" style="background:#f8fafc"><h3 style="margin:0 0 6px">＋ Add a template from an image</h3><p class="hint">Make the design anywhere (e.g. a business card or logo layout as PNG/JPG), upload it here — users get it in Studio → Templates and can add their own text and logo over it. For fully editable text, use the in-Studio method below.</p>
+  paint(`<div class="card"><h2>Design Studio templates (${r.data.length})</h2><div class="card" style="background:#fff7ed"><h3 style="margin:0 0 6px">🎨 Poster template builder (colourful, fully editable)</h3><p class="hint">Fill the boxes → live preview → Save. Users get a poster like the offer reel designs in Studio → Templates: every text, the badge, the buttons and the photo can be edited or replaced. No AI — just a layout generator.</p>
+  <div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:260px">
+   <div class="row"><input id="pb_name" placeholder="Template name"><input id="pb_cat" placeholder="Category (e.g. Offer Posters, Furniture)"></div>
+   <div class="row" style="margin-top:6px"><input id="pb_tags" placeholder="Search tags"><label><input type="checkbox" id="pb_prem"> Premium</label></div>
+   <div class="row" style="margin-top:6px"><select id="pb_size" onchange="pbPreview()">${Object.entries(PB_SIZES).map(([k,v])=>`<option value="${k}">${v[2]}</option>`).join('')}</select>
+    <select id="pb_color" onchange="pbPreview()">${Object.keys(PB_COLORS).map(k=>`<option>${k}</option>`).join('')}</select>
+    <select id="pb_deco" onchange="pbPreview()"><option value="rays">Sun rays</option><option value="dots">Dots</option><option value="none">Plain</option></select>
+    <label><input type="checkbox" id="pb_emoji" checked onchange="pbPreview()"> Emoji stickers</label></div>
+   <div class="row" style="margin-top:6px"><input id="pb_tag" value="Limited time" placeholder="Top tag"><input id="pb_h1" value="Mega" placeholder="Headline line 1"><input id="pb_h2" value="Offer" placeholder="Headline line 2"></div>
+   <div class="row" style="margin-top:6px"><input id="pb_badge" value="50%\nOFF" placeholder="Badge text (use \n for new line)"><input id="pb_sub" value="Grab the best deals before they are gone!" placeholder="Sub text" style="min-width:220px"></div>
+   <div class="row" style="margin-top:6px"><input id="pb_cta" value="Shop Now" placeholder="Button text"><input id="pb_phone" value="98765 43210" placeholder="Phone"><input id="pb_loc" value="Your Location" placeholder="Location"><input id="pb_web" value="www.offerposterstudio.in" placeholder="Website (story size only)"></div>
+   <div class="row" style="margin-top:6px"><span class="hint">Sample product photo (optional, PNG with transparent background looks best):</span><input type="file" id="pb_file" accept="image/*" onchange="pbPhotoPick()"></div>
+   <div class="row" style="margin-top:10px"><button class="btn o" onclick="pbPreview()">Preview</button><button class="btn" onclick="pbSave()">Save as template</button></div></div>
+   <div id="pb_prev" style="flex:0 0 auto;min-width:200px"><p class="hint">Press Preview.</p></div></div></div>
+  <div class="card" style="background:#f8fafc"><h3 style="margin:0 0 6px">＋ Add a template from an image</h3><p class="hint">Make the design anywhere (e.g. a business card or logo layout as PNG/JPG), upload it here — users get it in Studio → Templates and can add their own text and logo over it. For fully editable text, use the in-Studio method below.</p>
   <div class="row"><input id="tn" placeholder="Template name"><select id="tk">${TPL_KINDS.map((k,i)=>`<option value="${i}">${k[0]}</option>`).join('')}</select><input id="tc" placeholder="Category (e.g. Business Cards)"><input id="tg" placeholder="Tags"><label><input type="checkbox" id="tp"> Premium</label></div>
   <div class="row" style="margin-top:8px"><input type="file" id="tf" accept="image/*"><button class="btn" onclick="addTemplateImage()">＋ Add template</button></div></div>
   <p class="hint">Add new fully-editable ones inside the Studio: open a design → Makers & Tools → Admin → Templates → “Add current design as template”. They show for every user in Studio → Templates, with the category and tags you enter.</p>
@@ -203,6 +219,53 @@ async function addTemplateImage(){
   const c=document.createElement('canvas');const k=320/Math.max(W,H);c.width=Math.round(W*k);c.height=Math.round(H*k);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,(c.width-im.naturalWidth*sc*k)/2,(c.height-im.naturalHeight*sc*k)/2,im.naturalWidth*sc*k,im.naturalHeight*sc*k);
   let thumb=null;try{thumb=c.toDataURL('image/jpeg',0.8)}catch(e){}
   const r=await run(sb.from('studio_templates').insert({name,cat:$('tc').value.trim()||K[0].split(' (')[0],tags:$('tg').value.trim(),premium:$('tp').checked,thumb,doc:{kind:K[4],mm:K[3],width:W,height:H,pageIndex:0,pages:[page]}}),'Template added');if(!r.error)go('studiot')}
+// ---------- Poster template builder (editable text + photo, like the Studio offer posters) ----------
+const PB_SIZES={story:[1080,1920,'Story / Reel 9:16'],post:[1080,1080,'Square post 1:1'],port:[1080,1350,'Portrait 4:5']};
+const PB_LAYOUT={ // fractions of height; head = headline font as fraction of width
+  story:{tag:.057,tagH:.044,h1:.112,h2:.262,head:.25,ph:[.37,.73],badge:[.79,.405],br:.19,sub:.755,subS:.044,cta:.815,ctaH:.058,con:.893,web:.938,webS:.05},
+  post:{tag:.035,tagH:.075,h1:.115,h2:.285,head:.17,ph:[.46,.80],badge:[.79,.46],br:.14,sub:.815,subS:.034,cta:.865,ctaH:.085,con:.965,web:null,webS:.04},
+  port:{tag:.045,tagH:.058,h1:.115,h2:.265,head:.2,ph:[.41,.76],badge:[.79,.43],br:.16,sub:.775,subS:.038,cta:.835,ctaH:.07,con:.925,web:null,webS:.04}};
+const PB_COLORS={ // [bg1,bg2,accent,dark,text]
+  fire:['#B91C1C','#F59E0B','#FACC15','#4A0D0D','#FFFFFF'],ocean:['#0B1B3A','#2563EB','#38BDF8','#06122B','#FFFFFF'],green:['#064E3B','#65A30D','#FDE047','#052E16','#FFFFFF'],
+  purple:['#4C1D95','#DB2777','#FDE68A','#2E1065','#FFFFFF'],gold:['#1C1917','#92400E','#F5B82E','#0C0A09','#FBF6EA'],pink:['#BE185D','#FB7185','#FEF08A','#4C0519','#FFFFFF'],teal:['#0E6E5D','#14B8A6','#FDE047','#063B32','#FFFFFF'],light:['#FFF7E0','#FFD9A0','#E1553B','#7C2D12','#3B1F0A']};
+function pbRays(W,H,cx,cy,n,fill){const out=[];const corners=[[0,0],[W,0],[W,H],[0,H]];const hit=a=>{const dx=Math.cos(a),dy=Math.sin(a);let t=1e9;if(dx>1e-9)t=Math.min(t,(W-cx)/dx);if(dx<-1e-9)t=Math.min(t,(0-cx)/dx);if(dy>1e-9)t=Math.min(t,(H-cy)/dy);if(dy<-1e-9)t=Math.min(t,(0-cy)/dy);return{x:cx+dx*t,y:cy+dy*t}};
+  const ang=p=>{let a=Math.atan2(p[1]-cy,p[0]-cx);return a<0?a+Math.PI*2:a};
+  for(let i=0;i<n;i+=2){const a1=i/n*Math.PI*2,a2=(i+1)/n*Math.PI*2;const pts=[{x:cx,y:cy},hit(a1)];corners.map(c=>({c,a:ang(c)})).filter(o=>o.a>a1&&o.a<a2).sort((p,q)=>p.a-q.a).forEach(o=>pts.push({x:o.c[0],y:o.c[1]}));pts.push(hit(a2));
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),l=Math.min(...xs),t=Math.min(...ys);out.push({type:'polygon',version:'5.3.0',left:l,top:t,width:Math.max(...xs)-l,height:Math.max(...ys)-t,points:pts,fill,selectable:false,evented:false})}return out}
+function pbBurst(cx,cy,R,pts,fill){const P=[];for(let i=0;i<pts*2;i++){const a=i/(pts*2)*Math.PI*2,r=i%2?R*0.8:R;P.push({x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r})}const xs=P.map(p=>p.x),ys=P.map(p=>p.y),l=Math.min(...xs),t=Math.min(...ys);return{type:'polygon',version:'5.3.0',left:l,top:t,width:Math.max(...xs)-l,height:Math.max(...ys)-t,points:P,fill}}
+function pbText(text,cx,top,w,size,o){return Object.assign({type:'textbox',version:'5.3.0',originX:'center',originY:'top',left:cx,top,width:w,text,fontSize:size,fontFamily:"'Manrope',sans-serif",fontWeight:'800',fill:'#fff',textAlign:'center',lineHeight:1.1},o||{})}
+async function pbBuild(f){
+  const [W,H]=PB_SIZES[f.size],L=PB_LAYOUT[f.size],C=PB_COLORS[f.color],o=[];
+  o.push({type:'rect',version:'5.3.0',left:0,top:0,width:W,height:H,selectable:false,evented:false,fill:{type:'linear',gradientUnits:'pixels',coords:{x1:0,y1:0,x2:W*0.35,y2:H},colorStops:[{offset:0,color:C[0]},{offset:1,color:C[1]}]}});
+  const light=f.color==='light';
+  if(f.deco==='rays')pbRays(W,H,W/2,H*0.42,24,light?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.10)').forEach(p=>o.push(p));
+  if(f.deco==='dots'){for(let i=0;i<22;i++){const r=W*(0.012+(i%4)*0.01);o.push({type:'circle',version:'5.3.0',left:((i*137.5)%100)/100*W,top:((i*61.8)%100)/100*H,radius:r,fill:light?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.12)',selectable:false,evented:false})}}
+  if(f.emoji){[['🔥',.04,.04],['🎁',.8,.035],['💥',.05,L.ph[0]+.18],['💥',.86,L.ph[0]+.2]].forEach(e=>o.push(pbText(e[0],e[1]*W+W*0.07,e[2]*H,W*0.2,W*(f.size==='post'?0.11:0.14),{fontFamily:"'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif",fontWeight:'400'})))}
+  // tag pill
+  const pw=W*0.62,ph=H*L.tagH;o.push({type:'rect',version:'5.3.0',left:(W-pw)/2,top:L.tag*H,width:pw,height:ph,rx:ph/2,ry:ph/2,fill:C[2]});
+  o.push(pbText(f.tag.toUpperCase(),W/2,L.tag*H+ph/2-W*0.022,pw,W*0.04,{fill:C[3],charSpacing:120}));
+  // headline
+  const hs=W*L.head,hst={fontFamily:"'Anton',sans-serif",fontWeight:'400',fontSize:hs,fill:C[4],stroke:C[3],strokeWidth:Math.max(4,hs*0.035),paintFirst:'stroke',shadow:{color:'rgba(0,0,0,.4)',blur:0,offsetX:hs*0.03,offsetY:hs*0.03},lineHeight:1};
+  o.push(pbText(f.h1.toUpperCase(),W/2,L.h1*H,W*0.94,hs,hst));if(f.h2)o.push(pbText(f.h2.toUpperCase(),W/2,L.h2*H,W*0.94,hs,hst));
+  // product photo or placeholder
+  const bx=W*0.1,bw=W*0.8,by=L.ph[0]*H,bh=(L.ph[1]-L.ph[0])*H;
+  if(f.photo){const sc=Math.min(bw/f.photo.w,bh/f.photo.h);o.push({type:'image',version:'5.3.0',originX:'center',originY:'center',left:W/2,top:by+bh/2,width:f.photo.w,height:f.photo.h,scaleX:sc,scaleY:sc,src:f.photo.url,crossOrigin:'anonymous'})}
+  else{o.push({type:'rect',version:'5.3.0',left:bx,top:by,width:bw,height:bh,rx:30,ry:30,fill:'rgba(255,255,255,0.18)',stroke:'rgba(255,255,255,0.7)',strokeWidth:4,strokeDashArray:[18,12]});o.push(pbText('Your photo here',W/2,by+bh/2-W*0.03,bw,W*0.06,{fill:'rgba(255,255,255,0.9)',fontWeight:'700'}))}
+  // badge
+  if(f.badge){const [bxn,byn]=L.badge,R=W*L.br;o.push(pbBurst(bxn*W,byn*H,R,14,C[2]));const bl=f.badge.split(/\\n|\n/);o.push(pbText(bl.join('\n').toUpperCase(),bxn*W,byn*H-R*0.55,R*1.5,R*0.62,{fontFamily:"'Anton',sans-serif",fontWeight:'400',fill:C[3],angle:-8,lineHeight:1,originX:'center'}))}
+  // subtitle, CTA, contact, website
+  if(f.sub)o.push(pbText(f.sub,W/2,L.sub*H,W*0.86,W*L.subS,{fontWeight:'700',fill:C[4]}));
+  const cw=W*0.56,ch=H*L.ctaH;if(f.cta){o.push({type:'rect',version:'5.3.0',left:(W-cw)/2,top:L.cta*H,width:cw,height:ch,rx:ch/2,ry:ch/2,fill:C[3],shadow:{color:'rgba(0,0,0,.3)',blur:18,offsetX:0,offsetY:8}});o.push(pbText(f.cta,W/2,L.cta*H+ch/2-W*0.025,cw,W*0.05,{fill:'#fff'}))}
+  const con=[f.phone?'📞 '+f.phone:'',f.loc?'📍 '+f.loc:''].filter(Boolean).join('     ');if(con)o.push(pbText(con,W/2,L.con*H,W*0.94,W*0.036,{fontWeight:'700',fill:C[4]}));
+  if(f.web&&L.web)o.push(pbText(f.web,W/2,L.web*H,W*0.94,W*L.webS,{fontWeight:'400',fill:light?C[3]:C[4]}));
+  return{W,H,page:JSON.stringify({version:'5.3.0',background:C[0],objects:o})}}
+async function pbRender(page,W,H,mult){await (document.fonts&&document.fonts.ready);const el=document.createElement('canvas');const sc=new fabric.StaticCanvas(el,{width:W,height:H});await new Promise(r=>sc.loadFromJSON(page,r));sc.renderAll();const url=sc.toDataURL({format:'jpeg',quality:0.85,multiplier:mult});sc.dispose&&sc.dispose();return url}
+function pbForm(){const v=id=>($(id)?$(id).value.trim():'');return{size:v('pb_size'),color:v('pb_color'),deco:v('pb_deco'),tag:v('pb_tag'),h1:v('pb_h1'),h2:v('pb_h2'),badge:v('pb_badge'),sub:v('pb_sub'),cta:v('pb_cta'),phone:v('pb_phone'),loc:v('pb_loc'),web:v('pb_web'),emoji:$('pb_emoji')&&$('pb_emoji').checked,photo:window._pbPhoto||null}}
+async function pbPhotoPick(){const f=($('pb_file').files||[])[0];if(!f){window._pbPhoto=null;return pbPreview()}const path='admin-templates/'+Date.now()+'-'+f.name.replace(/[^\w.\-]/g,'_');const up=await sb.storage.from('user-logos').upload(path,f,{cacheControl:'3600',upsert:false});if(up.error)return toast('Upload failed: '+up.error.message,true);const url=sb.storage.from('user-logos').getPublicUrl(path).data.publicUrl;const im=await new Promise(ok=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=()=>ok(null);i.src=url});if(!im)return toast('Could not read the photo',true);window._pbPhoto={url,w:im.naturalWidth,h:im.naturalHeight};pbPreview()}
+async function pbPreview(){if(typeof fabric==='undefined')return toast('Preview needs the Fabric library (check internet)',true);const f=pbForm(),b=await pbBuild(f);const img=await pbRender(b.page,b.W,b.H,Math.min(1,520/b.H*1.0));$('pb_prev').innerHTML=`<img src="${img}" style="max-width:100%;max-height:520px;border-radius:10px;border:1px solid var(--line)">`}
+async function pbSave(){const f=pbForm(),name=$('pb_name').value.trim();if(!name)return toast('Enter a template name',true);if(typeof fabric==='undefined')return toast('Fabric library not loaded',true);const b=await pbBuild(f);let thumb=null;try{thumb=await pbRender(b.page,b.W,b.H,320/Math.max(b.W,b.H))}catch(e){}
+  const r=await run(sb.from('studio_templates').insert({name,cat:$('pb_cat').value.trim()||'Offer Posters',tags:$('pb_tags').value.trim(),premium:$('pb_prem').checked,thumb,doc:{kind:'design',mm:null,width:b.W,height:b.H,pageIndex:0,pages:[b.page]}}),'Template added — it is live in Studio → Templates');if(!r.error)go('studiot')}
+
 async function addCat(){const l=$('nc').value.trim();if(!l)return toast('Enter a name',true);const r=await run(sb.from('categories').insert({label:l,icon:$('ni').value.trim()||null}),'Added');if(!r.error)go('categories')}
 async function addGraphic(){const u=$('gu').value.trim();if(!/^https?:\/\//.test(u))return toast('Enter an https image URL',true);const r=await run(sb.from('store_assets').insert({image_url:u,type:$('gt').value,enabled:true}),'Added');if(!r.error)go('graphics')}
 async function uploadGraphics(){const fs=Array.from($('gf').files||[]);if(!fs.length)return toast('Choose image files',true);let ok=0;for(const f of fs){const path='admin-graphics/'+Date.now()+'-'+f.name.replace(/[^\w.\-]/g,'_');const up=await sb.storage.from('user-logos').upload(path,f,{cacheControl:'3600',upsert:false});if(up.error){toast(up.error.message,true);continue}const url=sb.storage.from('user-logos').getPublicUrl(path).data.publicUrl;const r=await sb.from('store_assets').insert({image_url:url,type:$('gt').value,enabled:true});if(r.error)toast(r.error.message,true);else ok++}toast(ok+' uploaded');go('graphics')}

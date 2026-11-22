@@ -6112,7 +6112,7 @@ var VideoMaker = (() => {
   const fontOf = () => (S.lang !== 'en' && StudioTpl.LF[S.lang] ? StudioTpl.LF[S.lang] + ',' : '') + "'Anton','Baloo Chettan 2','Noto Sans Malayalam',sans-serif";
   let S = null, raf = 0, playing = false, t0 = 0, recorder = null;
 
-  const fresh = () => ({ ratio: '9:16', trans: 'fade', theme: 'offer', lang: 'en', slides: [], music: null, ov: {}, bgImg: null, vol: 0.8, brand: '', cur: 0, loop: false });
+  const fresh = () => ({ ratio: '9:16', trans: 'fade', theme: 'offer', lang: 'en', slides: [], music: null, logo: null, tscale: 1, ov: {}, bgImg: null, vol: 0.8, brand: '', cur: 0, loop: false });
   const total = () => S.slides.reduce((a, s) => a + s.dur, 0);
   const dims = () => RATIOS[S.ratio];
   const plan = () => (window.STATE && STATE.profile && STATE.profile.plan) || 'free';
@@ -6151,6 +6151,13 @@ var VideoMaker = (() => {
           <label class="studio-label">Decoration</label><select onchange="VideoMaker.setOv('deco',this.value)">${DECOS.map(d => `<option value="${d[0]}" ${(S.ov.deco || '') === d[0] ? 'selected' : ''}>${d[1]}</option>`).join('')}</select>
           <label class="studio-label">Background photo (optional, for text slides)</label><input type="file" accept="image/*" onchange="VideoMaker.setBgImage(this)"><div class="studio-hint">${S.bgImg ? 'Photo set — <a href="#" onclick="VideoMaker.clearBgImage();return false">remove</a>' : 'None'}</div>
           <label class="studio-label">Language of sample text</label><select onchange="VideoMaker.setLang(this.value)">${Object.entries(LANG_LABEL).map(([k, l]) => `<option value="${k}" ${S.lang === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          <label class="studio-label">Text size (all slides): <b id="vmTs">${Math.round(S.tscale * 100)}%</b></label><input type="range" min="0.5" max="2" step="0.05" value="${S.tscale}" oninput="VideoMaker.setTextScale(this.value)">
+          <label class="studio-label">Time for every slide (seconds)</label><div style="display:flex;gap:6px"><input type="number" id="vmAllDur" min="1" max="60" step="0.5" value="3" style="width:80px"><button class="btn btn-outline btn-sm" onclick="VideoMaker.setAllDur()">Apply to all</button></div>
+          <label class="studio-label">Logo overlay on the whole video (optional)</label><input type="file" accept="image/*" onchange="VideoMaker.setLogo(this)">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0"><select onchange="VideoMaker.setLogoOpt('pos',this.value)">${[['tr', 'Top right'], ['tl', 'Top left'], ['br', 'Bottom right'], ['bl', 'Bottom left'], ['c', 'Centre']].map(o => `<option value="${o[0]}" ${(S.logo && S.logo.pos) === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+            <label class="studio-hint">Size <input type="range" min="5" max="60" step="1" value="${S.logo ? S.logo.size : 18}" oninput="VideoMaker.setLogoOpt('size',+this.value)"></label>
+            <label class="studio-hint">Opacity <input type="range" min="0.2" max="1" step="0.05" value="${S.logo ? S.logo.alpha : 1}" oninput="VideoMaker.setLogoOpt('alpha',+this.value)"></label>
+            <button class="btn btn-outline btn-sm" onclick="VideoMaker.clearLogo()">${S.logo ? 'Remove logo' : ''}</button></div>
           <label class="studio-label">Transition</label><select onchange="VideoMaker.setTrans(this.value)">${TRANS.map(t => `<option value="${t[0]}" ${S.trans === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select>
           <label class="studio-label">Brand / watermark text (optional)</label><input type="text" value="${esc(S.brand)}" oninput="VideoMaker.setBrand(this.value)" placeholder="Your shop name">
           <label class="studio-label">Music (optional)</label><input type="file" accept="audio/*" onchange="VideoMaker.setMusic(this)"><div id="vmMusic" class="studio-hint">${S.music ? esc(S.music.name) : 'No music'}</div>
@@ -6170,6 +6177,12 @@ var VideoMaker = (() => {
   function setRatio(r) { stop(); S.ratio = r; open(); }
   function setTrans(v) { S.trans = v; }
   function setBrand(v) { S.brand = v; }
+  function setLogo(input) { const f = input.files && input.files[0]; if (!f) return; const im = new Image(); im.onload = () => { S.logo = { el: im, pos: 'tr', size: 18, alpha: 1 }; open(); }; im.src = URL.createObjectURL(f); }
+  function setLogoOpt(k, v) { if (!S.logo) return; S.logo[k] = v; draw(S.slides.length ? startOf(S.cur) + 0.9 : 0); }
+  function clearLogo() { S.logo = null; open(); }
+  async function setPhoto2(i, input) { const f = input.files && input.files[0]; if (!f) return; const im = new Image(); im.src = URL.createObjectURL(f); await new Promise(r => { im.onload = r; im.onerror = r; }); S.slides[i].el2 = im; S.slides[i].src2 = im.src; renderSlides(); draw(startOf(i) + 0.9); }
+  function setTextScale(v) { S.tscale = parseFloat(v) || 1; const e = document.getElementById('vmTs'); if (e) e.textContent = Math.round(S.tscale * 100) + '%'; draw(S.slides.length ? startOf(S.cur) + 0.9 : 0); }
+  function setAllDur() { const v = Math.min(60, Math.max(1, parseFloat(document.getElementById('vmAllDur').value) || 3)); S.slides.forEach(s => { if (s.type !== 'video') s.dur = v; }); renderSlides(); draw(0); }
   function setTheme(v) { S.theme = v; S.ov = {}; refreshColors(); if (S.slides.every(x => x.type === 'text')) fromTheme(); else draw(0); }
   function refreshColors() { const e = eff(), set = (id, v) => { const el = document.getElementById(id); if (el) el.value = hex6(v); }; set('vmC0', e.bg[0]); set('vmC1', e.bg[1]); set('vmCT', e.text); set('vmCA', e.accent); }
   function setOv(k, v) {
@@ -6185,7 +6198,7 @@ var VideoMaker = (() => {
   function setLang(v) { S.lang = v; if (S.slides.every(x => x.type === 'text')) fromTheme(); else draw(0); }
 
   // ------------------------------------------------------------------ slides
-  const mk = o => Object.assign({ type: 'text', dur: 3, text: '', anim: 'fade', pos: 'bottom', el: null, src: '', name: '' }, o);
+  const mk = o => Object.assign({ type: 'text', dur: 3, text: '', anim: 'fade', pos: 'bottom', el: null, src: '', name: '', layout: 'full', el2: null, src2: '', ov: '#000000', ova: 0 }, o);
   async function fromTheme() {
     const texts = slidesFor(S.theme, S.lang); await ensureVidFonts(texts.join(' '));
     S.slides = texts.map((t, i) => mk({ type: 'text', text: t, dur: i === 0 ? 3 : 2.5, anim: ['pop', 'fade', 'up', 'zoom'][i % 4], pos: 'center' }));
@@ -6220,8 +6233,13 @@ var VideoMaker = (() => {
       <select style="padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'anim',this.value)">${ANIMS.map(a => `<option value="${a[0]}" ${s.anim === a[0] ? 'selected' : ''}>${a[1]}</option>`).join('')}</select>
       <input type="color" value="${hex6(s.tc || (s.type === 'text' ? eff().text : '#ffffff'))}" title="Text colour of this slide" style="width:34px;height:30px;padding:0;border:1.5px solid var(--line);border-radius:8px" oninput="VideoMaker.upd(${i},'tc',this.value)">
       <select style="padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'pos',this.value)">${['top', 'center', 'bottom'].map(p => `<option ${s.pos === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
-      <input type="number" min="1" max="15" step="0.5" value="${s.dur}" style="width:58px;padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'dur',parseFloat(this.value)||3)" title="Seconds">
-      <button class="icon-btn" onclick="VideoMaker.move(${i},-1)">↑</button><button class="icon-btn" onclick="VideoMaker.move(${i},1)">↓</button><button class="icon-btn" onclick="VideoMaker.del(${i})">🗑</button></div>`).join('') || '<p class="studio-empty-hint">Add photos, clips or text slides.</p>';
+      <label title="Text size of this slide" style="font-size:11px;display:flex;align-items:center;gap:3px">A<input type="range" min="0.5" max="2.5" step="0.05" value="${s.sz || 1}" style="width:70px" oninput="VideoMaker.upd(${i},'sz',parseFloat(this.value))">A</label>
+      <label title="Seconds this slide is shown" style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="number" min="1" max="60" step="0.5" value="${s.dur}" style="width:58px;padding:6px;border-radius:8px;border:1.5px solid var(--line);font-size:12px" onchange="VideoMaker.upd(${i},'dur',Math.min(60,Math.max(1,parseFloat(this.value)||3)))">s</label>
+      <button class="icon-btn" onclick="VideoMaker.move(${i},-1)">↑</button><button class="icon-btn" onclick="VideoMaker.move(${i},1)">↓</button><button class="icon-btn" onclick="VideoMaker.del(${i})">🗑</button>
+      <div style="flex-basis:100%;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px">
+        ${s.type === 'image' ? `<label>Layout <select onchange="VideoMaker.upd(${i},'layout',this.value);VideoMaker.renderSlides()" style="padding:5px;border-radius:8px;border:1.5px solid var(--line)"><option value="full" ${s.layout === 'full' ? 'selected' : ''}>Full photo</option><option value="lr" ${s.layout === 'lr' ? 'selected' : ''}>Split — left | right</option><option value="tb" ${s.layout === 'tb' ? 'selected' : ''}>Split — top / bottom</option></select></label>` + (s.layout !== 'full' ? `<label>2nd photo <input type="file" accept="image/*" onchange="VideoMaker.setPhoto2(${i},this)" style="max-width:150px">${s.el2 ? ' ✓' : ' (needed)'}</label>` : '') : ''}
+        <label>Overlay <input type="color" value="${hex6(s.ov)}" oninput="VideoMaker.upd(${i},'ov',this.value)" style="width:30px;height:26px;padding:0"> <input type="range" min="0" max="0.9" step="0.05" value="${s.ova || 0}" style="width:80px" oninput="VideoMaker.upd(${i},'ova',parseFloat(this.value))" title="Overlay strength (0 = none)"></label>
+      </div></div>`).join('') || '<p class="studio-empty-hint">Add photos, clips or text slides.</p>';
     const info = document.getElementById('vmInfo'); if (info) info.textContent = `${S.slides.length} slides · ${total().toFixed(1)} s` + (plan() === 'free' ? ` · Free plan: ${FREE_MAX_SEC}s max + watermark` : '');
   }
   function upd(i, k, v) { S.slides[i][k] = v; if (k === 'dur') renderSlides(); draw(startOf(i) + 0.9); }
@@ -6234,6 +6252,7 @@ var VideoMaker = (() => {
   function wrap(ctx, text, maxW) {
     const out = []; String(text).split('\n').forEach(par => { let line = ''; par.split(/\s+/).forEach(w => { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }); out.push(line); }); return out;
   }
+  function drawIn(ctx, el, x, y, w, h, zoom) { ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip(); drawCover(ctx, el, w, h, zoom, 0, 0); ctx.restore(); }
   function drawCover(ctx, el, W, H, zoom, ox, oy) {
     const iw = el.videoWidth || el.naturalWidth || el.width, ih = el.videoHeight || el.naturalHeight || el.height; if (!iw || !ih) return;
     const s = Math.max(W / iw, H / ih) * zoom, w = iw * s, h = ih * s; ctx.drawImage(el, (W - w) / 2 + ox, (H - h) / 2 + oy, w, h);
@@ -6261,14 +6280,20 @@ var VideoMaker = (() => {
     }
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     const kb = 1 + 0.08 * Math.min(1, lt / Math.max(0.5, s.dur)); // slow Ken-Burns zoom
-    if (s.type === 'image') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); drawCover(ctx, s.el, W, H, kb, 0, 0); }
+    if (s.type === 'image' && s.layout !== 'full' && s.el2) {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); const g = Math.max(4, Math.round(u * 0.008));
+      if (s.layout === 'lr') { drawIn(ctx, s.el, 0, 0, W / 2 - g / 2, H, kb); drawIn(ctx, s.el2, W / 2 + g / 2, 0, W / 2 - g / 2, H, kb); ctx.fillStyle = th.accent; ctx.fillRect(W / 2 - g / 2, 0, g, H); }
+      else { drawIn(ctx, s.el, 0, 0, W, H / 2 - g / 2, kb); drawIn(ctx, s.el2, 0, H / 2 + g / 2, W, H / 2 - g / 2, kb); ctx.fillStyle = th.accent; ctx.fillRect(0, H / 2 - g / 2, W, g); }
+    }
+    else if (s.type === 'image') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); drawCover(ctx, s.el, W, H, kb, 0, 0); }
     else if (s.type === 'video') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); drawCover(ctx, s.el, W, H, 1, 0, 0); }
     else { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); if (S.bgImg) { drawCover(ctx, S.bgImg, W, H, kb, 0, 0); ctx.fillStyle = isLight(th.text) ? 'rgba(0,0,0,.38)' : 'rgba(255,255,255,.45)'; ctx.fillRect(0, 0, W, H); } deco(ctx, th, W, H, lt); }
+    if (s.ova > 0) { ctx.save(); ctx.globalAlpha *= s.ova; ctx.fillStyle = s.ov || '#000000'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
     if (s.text) {
       if (s.type !== 'text') { const gr = ctx.createLinearGradient(0, H * 0.5, 0, H); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.55)'); ctx.fillStyle = gr; ctx.fillRect(0, H * 0.5, W, H * 0.5); }
       const p = ease(lt / 0.7); let txt = s.text, alpha = 1, dy = 0, dx = 0, sc = 1;
       if (s.anim === 'fade') alpha = p; else if (s.anim === 'up') { alpha = p; dy = (1 - p) * u * 0.08; } else if (s.anim === 'zoom') { alpha = p; sc = 0.6 + 0.4 * p; } else if (s.anim === 'pop') { const q = Math.min(1, lt / 0.6), o = 1.70158; alpha = Math.min(1, lt / 0.25); sc = 1 + (o + 1) * Math.pow(q - 1, 3) + o * Math.pow(q - 1, 2); sc = Math.max(0.01, sc); } else if (s.anim === 'left') { alpha = p; dx = -(1 - p) * W * 0.5; } else if (s.anim === 'type') txt = s.text.slice(0, Math.ceil(s.text.length * Math.min(1, lt / Math.max(0.8, s.dur * 0.6))));
-      const size = Math.round(u * (s.type === 'text' ? 0.085 : 0.06)); ctx.font = `800 ${size}px ${fontOf()}`;
+      const size = Math.round(u * (s.type === 'text' ? 0.085 : 0.06) * (S.tscale || 1) * (s.sz || 1)); ctx.font = `800 ${size}px ${fontOf()}`;
       const lines = wrap(ctx, txt, W * 0.84), lh = size * 1.18, bh = lines.length * lh, cy = s.pos === 'top' ? H * 0.18 : s.pos === 'center' ? H * 0.5 : H * 0.82 - bh / 2;
       ctx.globalAlpha *= alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.translate(W / 2 + dx, cy + dy); ctx.scale(sc, sc);
       const tcol = s.tc || (s.type === 'text' ? th.text : '#ffffff'), light = isLight(tcol);
@@ -6287,6 +6312,11 @@ var VideoMaker = (() => {
     // outgoing/incoming: draw previous slide underneath during the first trD seconds
     if (idx > 0 && trD && lt < trD) { const prev = S.slides[idx - 1]; drawSlide(ctx, prev, prev.dur, W, H, null); drawSlide(ctx, s, lt, W, H, { kind: S.trans, p: ease(lt / trD) }); }
     else drawSlide(ctx, s, lt, W, H, null);
+    if (S.logo && S.logo.el && (S.logo.el.naturalWidth || S.logo.el.width)) {
+      const L = S.logo, u2 = Math.min(W, H), lw = u2 * L.size / 100, lh = lw * (L.el.naturalHeight || L.el.height) / (L.el.naturalWidth || L.el.width), m = u2 * 0.04;
+      const x = L.pos === 'c' ? (W - lw) / 2 : (L.pos.endsWith('l') ? m : W - lw - m), y = L.pos === 'c' ? (H - lh) / 2 : (L.pos.startsWith('t') ? m : H - lh - m);
+      ctx.save(); ctx.globalAlpha = L.alpha; ctx.drawImage(L.el, x, y, lw, lh); ctx.restore();
+    }
     if (S.brand || plan() === 'free') {
       const txt = S.brand || '', wm = plan() === 'free' ? ((window.STATE && STATE.settings && STATE.settings.watermark_text) || 'OFFER POSTER STUDIO') : '';
       ctx.save(); ctx.font = `800 ${Math.round(Math.min(W, H) * 0.03)}px 'Manrope',sans-serif`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
@@ -6362,6 +6392,6 @@ var VideoMaker = (() => {
     toast(ext === 'mp4' ? 'Video exported (MP4)' : 'Video exported as WebM (this browser cannot record MP4)');
   }
 
-  return { setOv, setPreset, resetOv, setBgImage, clearBgImage, setVol, open, close, setRatio, setTrans, setBrand, setTheme, setLang, setMusic, addFiles, addTextSlide, fromTheme, upd, move, del, togglePlay, exportVideo, THEMES, pickMime };
+  return { renderSlides, setLogo, setLogoOpt, clearLogo, setPhoto2, setTextScale, setAllDur, setOv, setPreset, resetOv, setBgImage, clearBgImage, setVol, open, close, setRatio, setTrans, setBrand, setTheme, setLang, setMusic, addFiles, addTextSlide, fromTheme, upd, move, del, togglePlay, exportVideo, THEMES, pickMime };
 })();
 
