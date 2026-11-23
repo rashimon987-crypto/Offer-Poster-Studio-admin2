@@ -5996,7 +5996,7 @@ drop policy if exists "admin graphics" on store_assets;
 create policy "admin graphics" on store_assets for all using (is_studio_admin()) with check (is_studio_admin());`;
 
   let adTab = 'overview';
-  const ADMIN_TABS = [['overview', 'Overview'], ['users', 'Users'], ['templates', 'Templates'], ['graphics', 'Graphics'], ['fonts', 'Fonts'], ['pricing', 'Pricing & Settings'], ['payments', 'Payments'], ['setup', 'Setup SQL']];
+  const ADMIN_TABS = [['overview', 'Overview'], ['users', 'Users'], ['templates', 'Templates'], ['builtin', 'Built-in templates'], ['graphics', 'Graphics'], ['fonts', 'Fonts'], ['pricing', 'Pricing & Settings'], ['payments', 'Payments'], ['setup', 'Setup SQL']];
   function openAdmin(tab) {
     if (!isAdmin()) { toast('Admin access only', true); return; }
     adTab = tab || adTab;
@@ -6022,7 +6022,17 @@ create policy "admin graphics" on store_assets for all using (is_studio_admin())
         <input type="text" id="adtName" placeholder="Template name" value="${esc(A().doc().name)}"><input type="text" id="adtCat" placeholder="Category (e.g. Offer Posters, Onam)" style="margin-top:6px"><input type="text" id="adtTags" placeholder="Search tags (comma separated)" style="margin-top:6px">
         <label style="display:block;margin-top:8px;font-size:12.5px"><input type="checkbox" id="adtPrem"> Premium only</label>
         <div class="studio-actions"><button class="btn btn-primary" onclick="StudioStore.addTemplate()">＋ Add current design as template</button></div></div>
+        <div class="studio-form" style="margin-top:10px"><p class="studio-hint"><b>Paste template code</b> (copied with “Copy code”) to add a template.</p><input type="text" id="adcName" placeholder="Template name"><input type="text" id="adcCat" placeholder="Category" style="margin-top:6px"><textarea id="adcCode" placeholder="Paste code here…" style="width:100%;height:90px;margin-top:6px;font-family:monospace;font-size:11px"></textarea><div class="studio-actions"><button class="btn btn-primary" onclick="StudioStore.pasteCode()">＋ Add from code</button></div></div>
         <table class="studio-table" style="margin-top:12px"><tr><th></th><th>Name</th><th>Premium</th><th></th></tr>${r.data.map(t => `<tr><td>${t.thumb ? `<img src="${t.thumb}" style="width:38px;border-radius:6px">` : ''}</td><td>${esc(t.name)}<br><small>${esc(t.cat || '')}</small></td><td><input type="checkbox" ${t.premium ? 'checked' : ''} onchange="StudioStore.tplPremium('${t.id}',this.checked)"></td><td><button onclick="StudioStore.tplDelete('${t.id}')">Delete</button></td></tr>`).join('')}</table>`;
+    },
+    async builtin(b) {
+      const T = StudioTpl.all().filter(x => !x.doc), q = (adBq || '').toLowerCase(), cats = [...new Set(T.map(x => x.catLabel))];
+      const list = T.filter(x => (!adBc || x.catLabel === adBc) && (!q || (x.name + ' ' + x.catLabel + ' ' + (x.tags || '')).toLowerCase().includes(q))).slice(0, 60);
+      b.innerHTML = `<p class="studio-hint">These ${T.length} ready-made Studio templates are built into the app. <b>Copy code</b> gives the full editable code; <b>Add to my list</b> saves a copy in the database, so it appears in the standalone admin page (with Copy code / Delete / Premium) and you can edit it in Studio.</p>
+        <div class="studio-form"><input type="text" id="adBq" placeholder="Search" value="${esc(adBq || '')}" oninput="StudioStore.builtinFilter()"><select id="adBc" onchange="StudioStore.builtinFilter()" style="margin-top:6px"><option value="">All categories</option>${cats.map(c => `<option ${c === adBc ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+        <table class="studio-table" style="margin-top:8px"><tr><th></th><th>Name</th><th></th></tr>${list.map(x => `<tr><td><img data-bt="${x.id}" style="width:44px;border-radius:6px"></td><td>${esc(x.name)}<br><small>${esc(x.catLabel)}</small></td><td><button onclick="StudioStore.builtinCopy('${x.id}')">Copy code</button> <button onclick="StudioStore.builtinSave('${x.id}')">Add to my list</button></td></tr>`).join('')}</table>
+        <p class="studio-hint">${list.length === 60 ? 'Showing the first 60 — use search / category to narrow.' : ''}</p>`;
+      for (const x of list) { try { const u = await StudioTpl.thumbFor(x), im = b.querySelector(`img[data-bt="${x.id}"]`); if (im) im.src = u; } catch (e) { /* ignore */ } }
     },
     async graphics(b) {
       const r = await sb.from('store_assets').select('*').limit(100); if (r.error) return errBox(b, r.error);
@@ -6048,6 +6058,33 @@ create policy "admin graphics" on store_assets for all using (is_studio_admin())
   };
   const flash = async (p, ok) => { const r = await p; if (r.error) toast(r.error.message, true); else if (ok) toast(ok); return r; };
   async function setUser(id, patch) { await flash(sb.from('profiles').update(patch).eq('id', id), 'Updated'); }
+  let adBq = '', adBc = '';
+  function builtinFilter() { adBq = $('adBq'); adBc = (document.getElementById('adBc') || {}).value || ''; const inp = document.getElementById('adBq'), pos = inp ? inp.selectionStart : 0; openAdmin('builtin'); setTimeout(() => { const i2 = document.getElementById('adBq'); if (i2) { i2.focus(); try { i2.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } } }, 60); }
+  async function builtinDoc(id) {
+    const t = StudioTpl.all().find(x => x.id === id); if (!t) return null; const W = StudioTpl.SZ[t.size][0], H = StudioTpl.SZ[t.size][1];
+    await A().ensureFonts(StudioTpl.fontsFor(t), [t.head, t.tag, t.sub, t.cta, t.badge, t.foot].join(' '));
+    const spec = StudioTpl.build(t, W, H);
+    return { t, doc: { kind: 'design', mm: null, width: W, height: H, pageIndex: 0, pages: [A().specToJSON(spec, W, H)] } };
+  }
+  async function builtinCopy(id) {
+    const d = await builtinDoc(id); if (!d) return; const s = JSON.stringify(d.doc);
+    try { await navigator.clipboard.writeText(s); toast('Template code copied (' + Math.round(s.length / 1024) + ' KB)'); } catch (e) { const w = window.open('', '_blank'); if (w) w.document.write('<pre style="white-space:pre-wrap;word-break:break-all">' + s.replace(/</g, '&lt;') + '</pre>'); else toast('Copy blocked by the browser', true); }
+  }
+  async function builtinSave(id) {
+    const d = await builtinDoc(id); if (!d) return; const thumb = await thumbFromJSON(d.doc.pages[0], d.doc.width, d.doc.height, 320);
+    const r = await flash(sb.from('studio_templates').insert({ name: d.t.name, cat: d.t.catLabel, tags: d.t.tags || '', premium: !!d.t.premium, thumb, doc: d.doc }), 'Added to your template list'); if (!r.error) loadAdminContent();
+  }
+  async function pasteCode() {
+    const name = $('adcName'), raw = $('adcCode'); if (!name || !raw) return toast('Name and code are required', true);
+    let j; try { j = JSON.parse(raw); } catch (e) { return toast('Not valid JSON: ' + e.message, true); }
+    if (Array.isArray(j)) j = { pages: j }; const pg = x => typeof x === 'string' ? x : JSON.stringify(x); let doc;
+    if (Array.isArray(j.pages) && j.pages.length) doc = { kind: j.kind || 'design', mm: j.mm || null, width: +j.width || 1080, height: +j.height || 1080, pageIndex: 0, pages: j.pages.map(pg) };
+    else if (Array.isArray(j.objects)) doc = { kind: 'design', mm: null, width: +j.width || 1080, height: +j.height || 1080, pageIndex: 0, pages: [pg(j)] };
+    else return toast('Code must contain "pages" or "objects"', true);
+    const thumb = await thumbFromJSON(doc.pages[0], doc.width, doc.height, 320);
+    const r = await flash(sb.from('studio_templates').insert({ name, cat: $('adcCat') || 'Custom', tags: '', premium: false, thumb, doc }), 'Template added from code');
+    if (!r.error) { await loadAdminContent(); openAdmin('templates'); }
+  }
   async function addTemplate() {
     const name = $('adtName'), doc = A().getDoc(); if (!name) return toast('Enter a name', true);
     const thumb = await thumbFromJSON(doc.pages[doc.pageIndex || 0], doc.width, doc.height, 320);
@@ -6067,7 +6104,7 @@ create policy "admin graphics" on store_assets for all using (is_studio_admin())
   }
   window.openStudioAdmin = () => { goto('studio'); setTimeout(() => openAdmin('overview'), 120); };
 
-  return { autosave, saveNow, onEnterStudio, addUpload, useUpload, delUpload, beforeExport, afterExport, syncFavs, openMyDesigns, mdSearch, openDesign, dupDesign, renameDesign, delDesign, openAdmin, setUser, addTemplate, tplPremium, tplDelete, addGraphic, delGraphic, addFont, delFont, saveSettings, isAdmin, ADMIN_SQL, CONFIG, loadAdminContent };
+  return { autosave, saveNow, onEnterStudio, addUpload, useUpload, delUpload, beforeExport, afterExport, syncFavs, openMyDesigns, mdSearch, openDesign, dupDesign, renameDesign, delDesign, openAdmin, setUser, builtinFilter, builtinCopy, builtinSave, pasteCode, addTemplate, tplPremium, tplDelete, addGraphic, delGraphic, addFont, delFont, saveSettings, isAdmin, ADMIN_SQL, CONFIG, loadAdminContent };
 })();
 
 

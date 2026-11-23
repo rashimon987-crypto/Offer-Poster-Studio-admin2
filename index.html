@@ -107,13 +107,14 @@ async users(){
 
 async templates(){
   await loadCats();const r=await sb.from('templates').select('*').order('created_at',{ascending:false}).limit(300);if(r.error)throw r.error;
-  paint(`<div class="card"><h2>Poster-editor templates (${r.data.length})</h2><p class="hint">These appear in the Templates gallery. Toggle visibility / premium / featured, rename, change category or delete. (To create a new template visually, build it in the poster editor.)</p>
+  paint(`<div class="card"><h2>Poster-editor templates (${r.data.length})</h2><p class="hint">These appear in the Templates gallery. Toggle visibility / premium / featured, rename, change category or delete. (To create a new template visually, build it in the poster editor.) Use <b>Copy code</b> to get a template's code, and the box below to add a template from code.</p>
+  <div class="card" style="background:#eef6ff"><h3 style="margin:0 0 6px">{ } Paste poster-template code</h3><p class="hint">Paste code copied with “Copy code” from this list (same format). Code may include title, category, thumb_url, data, state, premium… Fields you fill below override the code.</p><div class="row"><input id="ptc_title" placeholder="Title (optional if in code)"><select id="ptc_cat"><option value="">Category (from code / none)</option>${CATS.map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join('')}</select><label><input type="checkbox" id="ptc_prem"> Premium</label></div><textarea id="ptc_code" placeholder="Paste code here…" style="width:100%;height:110px;margin-top:8px;font-family:monospace;font-size:11px"></textarea><div class="row" style="margin-top:6px"><button class="btn" onclick="ptcImport()">＋ Add from code</button></div></div>
   <div class="tw"><table><tr><th></th><th>Title</th><th>Category</th><th>On</th><th>Premium</th><th>Featured</th><th>Trending</th><th>Festival</th><th></th></tr>${r.data.map(t=>`<tr>
    <td>${t.thumb_url?`<img class="th" src="${esc(t.thumb_url)}">`:''}</td>
    <td><input value="${esc(t.title||t.name||'')}" style="width:150px" onchange="upd('templates','${t.id}',{title:this.value})"></td>
    <td><select onchange="upd('templates','${t.id}',{category_id:this.value||null})"><option value="">—</option>${CATS.map(c=>`<option value="${c.id}" ${c.id===t.category_id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></td>
    ${['enabled','premium','featured','trending','festival'].map(k=>`<td><input type="checkbox" ${t[k]?'checked':''} onchange="upd('templates','${t.id}',{${k}:this.checked})"></td>`).join('')}
-   <td><button class="btn s d" onclick="del('templates','${t.id}')">Delete</button></td></tr>`).join('')}</table></div></div>`)},
+   <td><button class="btn s o" onclick="ptcCopy('${t.id}')">Copy code</button> <button class="btn s d" onclick="del('templates','${t.id}')">Delete</button></td></tr>`).join('')}</table></div></div>`)},
 
 async studiot(){
   const r=await sb.from('studio_templates').select('id,name,cat,premium,tags,thumb,created_at').order('created_at',{ascending:false});if(r.error)throw r.error;
@@ -131,16 +132,20 @@ async studiot(){
    <div class="row" style="margin-top:6px"><span class="hint">Sample product photo (optional, PNG with transparent background looks best):</span><input type="file" id="pb_file" accept="image/*" onchange="pbPhotoPick()"></div>
    <div class="row" style="margin-top:10px"><button class="btn o" onclick="pbPreview()">Preview</button><button class="btn" onclick="pbSave()">Save as template</button></div></div>
    <div id="pb_prev" style="flex:0 0 auto;min-width:200px"><p class="hint">Press Preview.</p></div></div></div>
+  <div class="card" style="background:#eef6ff"><h3 style="margin:0 0 6px">{ } Paste template code</h3><p class="hint">Paste the template code (JSON) here and it becomes a template that users can fully edit in Studio. Accepted: (1) a whole Studio design — <code>{"width":1080,"height":1080,"pages":[…]}</code> — e.g. copied with the “Copy code” button of another template below; (2) a single page — <code>{"objects":[…]}</code> — then choose its size.</p>
+  <div class="row"><input id="pc_name" placeholder="Template name"><input id="pc_cat" placeholder="Category"><input id="pc_tags" placeholder="Tags"><label><input type="checkbox" id="pc_prem"> Premium</label><select id="pc_size">${TPL_KINDS.map((k,i)=>`<option value="${i}">${k[0]}</option>`).join('')}</select></div>
+  <textarea id="pc_code" placeholder='Paste template code here…' style="width:100%;height:130px;margin-top:8px;font-family:monospace;font-size:11px"></textarea>
+  <div class="row" style="margin-top:6px"><button class="btn" onclick="codeImport()">＋ Add from code</button></div></div>
   <div class="card" style="background:#f8fafc"><h3 style="margin:0 0 6px">＋ Add a template from an image</h3><p class="hint">Make the design anywhere (e.g. a business card or logo layout as PNG/JPG), upload it here — users get it in Studio → Templates and can add their own text and logo over it. For fully editable text, use the in-Studio method below.</p>
   <div class="row"><input id="tn" placeholder="Template name"><select id="tk">${TPL_KINDS.map((k,i)=>`<option value="${i}">${k[0]}</option>`).join('')}</select><input id="tc" placeholder="Category (e.g. Business Cards)"><input id="tg" placeholder="Tags"><label><input type="checkbox" id="tp"> Premium</label></div>
   <div class="row" style="margin-top:8px"><input type="file" id="tf" accept="image/*"><button class="btn" onclick="addTemplateImage()">＋ Add template</button></div></div>
-  <p class="hint">Add new fully-editable ones inside the Studio: open a design → Makers & Tools → Admin → Templates → “Add current design as template”. They show for every user in Studio → Templates, with the category and tags you enter.</p>
+  <p class="hint"><b>Ready-made built-in templates (268):</b> open the site → Studio → Admin (top menu) → <b>Built-in templates</b> tab. There you can “Copy code” of any of them, or “Add to my list” — after that it appears in this table, where you can edit its name/category/premium, “Copy code” or delete it.</p><p class="hint">Add new fully-editable ones inside the Studio: open a design → Makers & Tools → Admin → Templates → “Add current design as template”. They show for every user in Studio → Templates, with the category and tags you enter.</p>
   <div class="tw"><table><tr><th></th><th>Name</th><th>Category</th><th>Tags</th><th>Premium</th><th></th></tr>${r.data.map(t=>`<tr><td>${t.thumb?`<img class="th" src="${t.thumb}">`:''}</td>
    <td><input value="${esc(t.name)}" style="width:150px" onchange="upd('studio_templates','${t.id}',{name:this.value})"></td>
    <td><input value="${esc(t.cat||'')}" style="width:120px" onchange="upd('studio_templates','${t.id}',{cat:this.value})"></td>
    <td><input value="${esc(t.tags||'')}" style="width:150px" onchange="upd('studio_templates','${t.id}',{tags:this.value})"></td>
    <td><input type="checkbox" ${t.premium?'checked':''} onchange="upd('studio_templates','${t.id}',{premium:this.checked})"></td>
-   <td><button class="btn s d" onclick="del('studio_templates','${t.id}')">Delete</button></td></tr>`).join('')}</table></div></div>`)},
+   <td><button class="btn s o" onclick="codeCopy('${t.id}')">Copy code</button> <button class="btn s d" onclick="del('studio_templates','${t.id}')">Delete</button></td></tr>`).join('')}</table></div></div>`)},
 
 async categories(){
   await loadCats();
@@ -266,6 +271,29 @@ async function pbPreview(){if(typeof fabric==='undefined')return toast('Preview 
 async function pbSave(){const f=pbForm(),name=$('pb_name').value.trim();if(!name)return toast('Enter a template name',true);if(typeof fabric==='undefined')return toast('Fabric library not loaded',true);const b=await pbBuild(f);let thumb=null;try{thumb=await pbRender(b.page,b.W,b.H,320/Math.max(b.W,b.H))}catch(e){}
   const r=await run(sb.from('studio_templates').insert({name,cat:$('pb_cat').value.trim()||'Offer Posters',tags:$('pb_tags').value.trim(),premium:$('pb_prem').checked,thumb,doc:{kind:'design',mm:null,width:b.W,height:b.H,pageIndex:0,pages:[b.page]}}),'Template added — it is live in Studio → Templates');if(!r.error)go('studiot')}
 
+async function codeImport(){
+  const name=$('pc_name').value.trim(),raw=$('pc_code').value.trim();if(!name)return toast('Enter a template name',true);if(!raw)return toast('Paste the template code',true);
+  let j;try{j=JSON.parse(raw)}catch(e){return toast('This is not valid JSON: '+e.message,true)}
+  let doc;const K=TPL_KINDS[+$('pc_size').value];
+  if(Array.isArray(j))j={pages:j};
+  const pg=x=>typeof x==='string'?x:JSON.stringify(x);
+  if(j.pages&&Array.isArray(j.pages)&&j.pages.length){doc={kind:j.kind||K[4],mm:j.mm||K[3],width:+j.width||K[1],height:+j.height||K[2],pageIndex:0,pages:j.pages.map(pg)}}
+  else if(Array.isArray(j.objects)){doc={kind:K[4],mm:K[3],width:+j.width||K[1],height:+j.height||K[2],pageIndex:0,pages:[pg(Object.assign({version:'5.3.0'},j))]}}
+  else return toast('Code must contain "pages" (whole design) or "objects" (one page)',true);
+  if(!(doc.width>0&&doc.height>0))return toast('Width/height missing',true);
+  try{JSON.parse(doc.pages[0])}catch(e){return toast('First page is not valid',true)}
+  let thumb=null;try{if(typeof fabric!=='undefined')thumb=await pbRender(doc.pages[0],doc.width,doc.height,320/Math.max(doc.width,doc.height))}catch(e){}
+  const r=await run(sb.from('studio_templates').insert({name,cat:$('pc_cat').value.trim()||'Custom',tags:$('pc_tags').value.trim(),premium:$('pc_prem').checked,thumb,doc}),'Template added from code');if(!r.error)go('studiot')}
+async function codeCopy(id){const r=await sb.from('studio_templates').select('doc').eq('id',id).single();if(r.error)return toast(r.error.message,true);const s=JSON.stringify(r.data.doc);try{await navigator.clipboard.writeText(s);toast('Template code copied ('+Math.round(s.length/1024)+' KB)')}catch(e){const w=window.open('','_blank');if(w){w.document.write('<pre style="white-space:pre-wrap;word-break:break-all">'+s.replace(/</g,'&lt;')+'</pre>')}else toast('Copy blocked by the browser',true)}}
+async function ptcCopy(id){const r=await sb.from('templates').select('*').eq('id',id).single();if(r.error)return toast(r.error.message,true);const o=r.data;['id','created_at','downloads'].forEach(k=>delete o[k]);const cat=CATS.find(c=>c.id===o.category_id);if(cat)o.category=cat.label;const s=JSON.stringify(o);try{await navigator.clipboard.writeText(s);toast('Template code copied ('+Math.round(s.length/1024)+' KB)')}catch(e){const w=window.open('','_blank');if(w)w.document.write('<pre style="white-space:pre-wrap;word-break:break-all">'+s.replace(/</g,'&lt;')+'</pre>');else toast('Copy blocked by the browser',true)}}
+async function ptcImport(){
+  const raw=$('ptc_code').value.trim();if(!raw)return toast('Paste the template code',true);let j;try{j=JSON.parse(raw)}catch(e){return toast('Not valid JSON: '+e.message,true)}
+  if(!j||typeof j!=='object'||(j.data==null&&j.state==null))return toast('Code must contain "data" or "state" (copy it with “Copy code” from this list)',true);
+  const row={};['title','name','thumb_url','data','state','premium','featured','trending','festival','enabled'].forEach(k=>{if(j[k]!==undefined)row[k]=j[k]});
+  const cid=$('ptc_cat').value||j.category_id||((CATS.find(c=>c.label===j.category)||{}).id)||null;if(cid)row.category_id=cid;
+  const ti=$('ptc_title').value.trim();if(ti)row.title=ti;if(!row.title&&!row.name)return toast('Enter a title',true);if(!row.title)row.title=row.name;
+  if($('ptc_prem').checked)row.premium=true;if(row.enabled===undefined)row.enabled=true;
+  const r=await run(sb.from('templates').insert(row),'Template added from code');if(!r.error)go('templates')}
 async function addCat(){const l=$('nc').value.trim();if(!l)return toast('Enter a name',true);const r=await run(sb.from('categories').insert({label:l,icon:$('ni').value.trim()||null}),'Added');if(!r.error)go('categories')}
 async function addGraphic(){const u=$('gu').value.trim();if(!/^https?:\/\//.test(u))return toast('Enter an https image URL',true);const r=await run(sb.from('store_assets').insert({image_url:u,type:$('gt').value,enabled:true}),'Added');if(!r.error)go('graphics')}
 async function uploadGraphics(){const fs=Array.from($('gf').files||[]);if(!fs.length)return toast('Choose image files',true);let ok=0;for(const f of fs){const path='admin-graphics/'+Date.now()+'-'+f.name.replace(/[^\w.\-]/g,'_');const up=await sb.storage.from('user-logos').upload(path,f,{cacheControl:'3600',upsert:false});if(up.error){toast(up.error.message,true);continue}const url=sb.storage.from('user-logos').getPublicUrl(path).data.publicUrl;const r=await sb.from('store_assets').insert({image_url:url,type:$('gt').value,enabled:true});if(r.error)toast(r.error.message,true);else ok++}toast(ok+' uploaded');go('graphics')}
