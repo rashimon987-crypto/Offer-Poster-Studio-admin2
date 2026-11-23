@@ -238,7 +238,7 @@ function pbRays(W,H,cx,cy,n,fill){const out=[];const corners=[[0,0],[W,0],[W,H],
   for(let i=0;i<n;i+=2){const a1=i/n*Math.PI*2,a2=(i+1)/n*Math.PI*2;const pts=[{x:cx,y:cy},hit(a1)];corners.map(c=>({c,a:ang(c)})).filter(o=>o.a>a1&&o.a<a2).sort((p,q)=>p.a-q.a).forEach(o=>pts.push({x:o.c[0],y:o.c[1]}));pts.push(hit(a2));
     const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),l=Math.min(...xs),t=Math.min(...ys);out.push({type:'polygon',version:'5.3.0',left:l,top:t,width:Math.max(...xs)-l,height:Math.max(...ys)-t,points:pts,fill,selectable:false,evented:false})}return out}
 function pbBurst(cx,cy,R,pts,fill){const P=[];for(let i=0;i<pts*2;i++){const a=i/(pts*2)*Math.PI*2,r=i%2?R*0.8:R;P.push({x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r})}const xs=P.map(p=>p.x),ys=P.map(p=>p.y),l=Math.min(...xs),t=Math.min(...ys);return{type:'polygon',version:'5.3.0',left:l,top:t,width:Math.max(...xs)-l,height:Math.max(...ys)-t,points:P,fill}}
-function pbText(text,cx,top,w,size,o){return Object.assign({type:'textbox',version:'5.3.0',originX:'center',originY:'top',left:cx,top,width:w,text,fontSize:size,fontFamily:"'Manrope',sans-serif",fontWeight:'800',fill:'#fff',textAlign:'center',lineHeight:1.1},o||{})}
+function pbText(text,cx,top,w,size,o){return Object.assign({type:'textbox',version:'5.3.0',styles:[],originX:'center',originY:'top',left:cx,top,width:w,text,fontSize:size,fontFamily:"'Manrope',sans-serif",fontWeight:'800',fill:'#fff',textAlign:'center',lineHeight:1.1},o||{})}
 async function pbBuild(f){
   const [W,H]=PB_SIZES[f.size],L=PB_LAYOUT[f.size],C=PB_COLORS[f.color],o=[];
   o.push({type:'rect',version:'5.3.0',left:0,top:0,width:W,height:H,selectable:false,evented:false,fill:{type:'linear',gradientUnits:'pixels',coords:{x1:0,y1:0,x2:W*0.35,y2:H},colorStops:[{offset:0,color:C[0]},{offset:1,color:C[1]}]}});
@@ -276,7 +276,7 @@ async function codeImport(){
   let j;try{j=JSON.parse(raw)}catch(e){return toast('This is not valid JSON: '+e.message,true)}
   let doc;const K=TPL_KINDS[+$('pc_size').value];
   if(Array.isArray(j))j={pages:j};
-  const pg=x=>typeof x==='string'?x:JSON.stringify(x);
+  const fx=l=>(l||[]).forEach(ob=>{if(ob&&/text/i.test(ob.type)&&(ob.styles==null))ob.styles=[];if(ob&&ob.objects)fx(ob.objects)});const pg=x=>{let o=typeof x==='string'?JSON.parse(x):x;fx(o.objects);return JSON.stringify(o)};
   if(j.pages&&Array.isArray(j.pages)&&j.pages.length){doc={kind:j.kind||K[4],mm:j.mm||K[3],width:+j.width||K[1],height:+j.height||K[2],pageIndex:0,pages:j.pages.map(pg)}}
   else if(Array.isArray(j.objects)){doc={kind:K[4],mm:K[3],width:+j.width||K[1],height:+j.height||K[2],pageIndex:0,pages:[pg(Object.assign({version:'5.3.0'},j))]}}
   else return toast('Code must contain "pages" (whole design) or "objects" (one page)',true);
