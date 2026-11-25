@@ -3393,8 +3393,26 @@ var Studio = (() => {
     if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) { toast('Use PNG, JPG or WebP images', true); return; }
     if (file.size > 15 * 1024 * 1024) { toast('Image is larger than 15 MB', true); return; }
     const reader = new FileReader();
-    reader.onload = ev => { addImageURL(ev.target.result); if (window.StudioStore) StudioStore.addUpload(file.name, ev.target.result); };
+    reader.onload = ev => downscaleDataURL(ev.target.result, file.type, url => { addImageURL(url); if (window.StudioStore) StudioStore.addUpload(file.name, url); });
     reader.readAsDataURL(file);
+  }
+  // Phone photos are often 4000-8000px. Anything above MAXPHOTO is redrawn smaller so the canvas stays fast
+  // and uploads/saves stay light (PNG keeps transparency; JPG/WebP are re-encoded at high quality).
+  const MAXPHOTO = 3000;
+  function downscaleDataURL(url, type, cb) {
+    const im = new Image();
+    im.onload = () => {
+      const m = Math.max(im.naturalWidth, im.naturalHeight);
+      if (!(m > MAXPHOTO)) { cb(url); return; }
+      try {
+        const k = MAXPHOTO / m, c = document.createElement('canvas');
+        c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        cb(/png/i.test(type) ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92));
+      } catch (e) { cb(url); }
+    };
+    im.onerror = () => cb(url);
+    im.src = url;
   }
   function addImageURL(url, opts) {
     opts = opts || {};
@@ -3552,7 +3570,8 @@ var Studio = (() => {
   function fitZoom() {
     userZoomed = false;
     const sc = document.getElementById('studioCanvasScroll'); if (!sc || !sc.clientWidth) return;
-    const availW = sc.clientWidth - 48, availH = sc.clientHeight - 48;
+    const cs = getComputedStyle(sc), padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0), padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const availW = sc.clientWidth - padX, availH = sc.clientHeight - padY;
     applyZoomRaw(Math.max(0.05, Math.min(availW / designW, availH / designH, 1.5)));
   }
   const zoomIn = () => applyZoom(zoomLevel * 1.2, true), zoomOut = () => applyZoom(zoomLevel / 1.2, true);
@@ -3815,7 +3834,7 @@ var Studio = (() => {
     addRect, addEllipse, addTriangle, addLine, addText, handleImageUpload,
     deleteSelection, duplicateSelection, copySelection, pasteSelection, selectAll, groupSelection, ungroupSelection, toggleLockSelection, flip,
     bringToFront, sendToBack, bringForwardSel, sendBackwardSel, align, alignEach, setPosition,
-    toggleGrid, zoomIn, zoomOut, zoomReset, fitZoom, setCanvasSize: setCanvasSizeFromInputs,
+    toggleGrid, zoomIn, zoomOut, zoomReset, fitZoom, setZoom: z => applyZoom(z, true), getZoom: () => zoomLevel, isUserZoomed: () => userZoomed, setCanvasSize: setCanvasSizeFromInputs,
     selectLayer, toggleLayerVisibility, layerLock, bringForward, sendBackward,
     setProp, setPropLive, switchPage, addPage, deletePage, movePage,
     exportDialogOpen, exportDialogClose, updateExportUI, doExport,
@@ -3824,13 +3843,12 @@ var Studio = (() => {
   // Surface for feature modules (studio-lib / fx / tpl / tools / store).
   publicApi.api = {
     canvas: () => canvas, commit, refresh: renderLayers, INCLUDE,
-    size: () => ({ w: designW, h: designH, mm: designMM }), setSize, center, addObj, addImageURL, addImageFile,
+    downscale: downscaleDataURL, size: () => ({ w: designW, h: designH, mm: designMM }), setSize, center, addObj, addImageURL, addImageFile,
     fixJSON, getDoc, loadDoc, loadBuilt, newDoc, specToJSON, ensureFonts, refreshText, renderProps, doc: () => ({ id: docId, name: designName, kind: docKind }),
     setDocId: id => { docId = id; }, pageCount: () => pages.length, flushSave, isBooted: () => booted, zoom: () => zoomLevel
   };
   return publicApi;
 })();
-
 
 // ======================= studio-lib.js =======================
 // ===================================================================================
@@ -4370,7 +4388,6 @@ var StudioLib = (() => {
   };
 })();
 
-
 // ======================= studio-fx.js =======================
 // ===================================================================================
 // DESIGN STUDIO — properties panel ("Edit" tab): position/size, text styling & effects,
@@ -4685,7 +4702,6 @@ var StudioFx = (() => {
     fxLive, fxSet, fxCommit, preset, rmColor, rmDistLive, rmToggle, pickCorner, cropLive, cropCommit, cropReset, fitPage, setFrame, onScaling };
 })();
 
-
 // ======================= studio-tpl.js =======================
 // ===================================================================================
 // DESIGN STUDIO — template library.
@@ -4695,7 +4711,7 @@ var StudioFx = (() => {
 // landscape thumbnail, wide banner). Includes search, category filter, favourites,
 // free/premium flags and live previews.
 // ===================================================================================
-var StudioTpl = (() => {
+const StudioTpl = (() => {
   const A = () => Studio.api, F = fabric;
   const EMOJI = "'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif";
   const FONT = {
@@ -5268,7 +5284,6 @@ var StudioTpl = (() => {
   return { PACKS, LANGS, LF, CAT_META, templates, CATS, SZ, build, fontsFor, setQuery, setCat, setLang, setAccess, toggleFav, use, useTemplate, preview, closePreview, usePreview, addExtra, bySize, thumbFor, FONT, PAL, L, favs: () => favs, all };
 })();
 
-
 // ======================= studio-tools.js =======================
 // ===================================================================================
 // DESIGN STUDIO — makers: Logo Maker, Business Card Maker, Social Media Studio,
@@ -5743,7 +5758,6 @@ var StudioTools = (() => {
   return { PRESETS, preset, dlg, closeDlg, openHub, openLogo, openCard, openSocial, openDocs, openCustom, customCreate, open, logoRefresh, logoPick, logoUse, cardRefresh, cardPick, cardUse, newFromPreset, applyPreset, docUse, logoVariants, cardPages, docBuild, DOC_TYPES, parseItems };
 })();
 
-
 // ======================= studio-store.js =======================
 // ===================================================================================
 // DESIGN STUDIO — storage, plan rules, My Designs and Admin dashboard.
@@ -6132,6 +6146,435 @@ create policy "admin graphics" on store_assets for all using (is_studio_admin())
   return { autosave, saveNow, onEnterStudio, addUpload, useUpload, delUpload, beforeExport, afterExport, syncFavs, openMyDesigns, mdSearch, openDesign, dupDesign, renameDesign, delDesign, openAdmin, setUser, builtinFilter, builtinCopy, builtinSave, pasteCode, addTemplate, tplPremium, tplDelete, addGraphic, delGraphic, addFont, delFont, saveSettings, isAdmin, ADMIN_SQL, CONFIG, loadAdminContent };
 })();
 
+// ======================= studio-mobile.js =======================
+/* Studio – dedicated phone layout (<=760px wide). Adds: bottom toolbar, bottom sheets, contextual selection bar,
+   pinch / two-finger pan zoom, zoom buttons, keyboard-safe layout, replace-image. Desktop layout is untouched:
+   everything here is a no-op unless the screen has the `sm` class (set only when the window is <=760px wide). */
+var StudioMobile = (() => {
+  const mq = window.matchMedia('(max-width:760px)');
+  let screen, on = false, built = false, bound = false, cur = null, full = false, editing = false;
+  const $ = id => document.getElementById(id);
+  const A = () => (window.Studio && Studio.api) || null;
+  const cv = () => { const a = A(); return a && a.isBooted() ? a.canvas() : null; };
+  let scr, stack, wrap;
+
+  // ---------------------------------------------------------------- build DOM (once)
+  const BAR = [
+    ['templates', '▣', 'Templates'], ['elements', '✦', 'Elements'], ['text', 'T', 'Text'], ['background', '▦', 'Background'],
+    ['uploads', '⬆', 'Uploads'], ['photos', '🖼️', 'Photos'], ['shapes', '◆', 'Shapes'], ['layers', '☰', 'Layers'], ['more', '⋯', 'More']
+  ];
+  function build() {
+    if (built) return; built = true;
+    screen = $('screen-studio'); scr = $('studioCanvasScroll'); stack = $('studioCanvasStack'); wrap = $('studioCanvasWrap');
+    const body = screen.querySelector('.studio-body');
+    // grabbers / close / expand for both sheets
+    const head = (title) => `<div class="sm-sheet-head sm-only"><div class="sm-grab" data-grab></div><span class="sm-sheet-title">${title}</span>
+      <button class="sm-hbtn" data-a="expand" aria-label="Expand or collapse">⤢</button><button class="sm-hbtn" data-a="close" aria-label="Close">✕</button></div>`;
+    const drawer = $('studioDrawer'), panel = $('studioPanel');
+    drawer.insertAdjacentHTML('afterbegin', head('Library'));
+    panel.insertAdjacentHTML('afterbegin', head('Edit'));
+    const more = document.createElement('div');
+    more.id = 'smMore'; more.className = 'sm-more';
+    more.innerHTML = head('More') + `<div class="sm-more-body"></div>`;
+    body.appendChild(more);
+    // bottom contextual bar + toolbar
+    const ctx = document.createElement('div'); ctx.id = 'smCtx'; ctx.className = 'sm-ctx sm-only';
+    const bar = document.createElement('nav'); bar.id = 'smBar'; bar.className = 'sm-bar sm-only';
+    bar.innerHTML = BAR.map(([k, i, l]) => `<button class="sm-bb" data-bar="${k}"><i>${i}</i><span>${l}</span></button>`).join('');
+    const after = $('studioDialog') ? $('studioDialog').previousElementSibling : null;
+    screen.insertBefore(ctx, screen.querySelector('.studio-modal')); screen.insertBefore(bar, screen.querySelector('.studio-modal'));
+    // zoom controls
+    const z = document.createElement('div'); z.id = 'smZoom'; z.className = 'sm-zoom sm-only';
+    z.innerHTML = `<button data-a="zout" aria-label="Zoom out">−</button><button data-a="zfit" id="smZoomLbl" aria-label="Fit to screen">100%</button><button data-a="zin" aria-label="Zoom in">+</button>`;
+    wrap.appendChild(z);
+    // hidden inputs
+    const pi = document.createElement('input'); pi.type = 'file'; pi.id = 'smPhotoInput'; pi.accept = 'image/png,image/jpeg,image/webp'; pi.multiple = true; pi.style.display = 'none';
+    pi.onchange = e => Studio.handleImageUpload(e);
+    const ri = document.createElement('input'); ri.type = 'file'; ri.id = 'smReplaceInput'; ri.accept = 'image/png,image/jpeg,image/webp'; ri.style.display = 'none';
+    ri.onchange = e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) replaceImage(f); };
+    screen.appendChild(pi); screen.appendChild(ri);
+    // mirror the zoom label
+    const lbl = $('studioZoomLabel');
+    if (lbl && window.MutationObserver) new MutationObserver(() => { const l = $('smZoomLbl'); if (l) l.textContent = lbl.textContent; }).observe(lbl, { childList: true, characterData: true, subtree: true });
+
+    screen.addEventListener('click', onClick);
+    bindGestures();
+    // keyboard-safe layout
+    if (window.visualViewport) { visualViewport.addEventListener('resize', onViewport); visualViewport.addEventListener('scroll', onViewport); }
+    screen.addEventListener('focusin', e => {
+      const t = e.target; if (!on || !t.matches || !t.matches('input,textarea,select')) return;
+      if (t.closest('.studio-drawer,.studio-panel,.studio-modal')) setTimeout(() => { try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { /* old browser */ } }, 320);
+    });
+    screen.addEventListener('gesturestart', e => { if (on) e.preventDefault(); }, { passive: false });
+    wrapDrawer();
+    initGrab();
+  }
+
+  // Keep our state in sync when other modules open/close the library drawer.
+  function wrapDrawer() {
+    const oo = Studio.openDrawer, oc = Studio.closeDrawer;
+    Studio.openDrawer = function (id) { oo.apply(this, arguments); if (on) { cur = 'drawer'; curTab = id || curTab; applySheet(); } };
+    Studio.closeDrawer = function () { oc.apply(this, arguments); if (on && cur === 'drawer') { cur = null; applySheet(); } };
+  }
+
+  // ---------------------------------------------------------------- mode switching
+  function apply() {
+    if (!screen) screen = $('screen-studio'); if (!screen) return;
+    const want = mq.matches && screen.classList.contains('active');
+    document.body.classList.toggle('studio-sm', want);
+    if (want === on && screen.classList.contains('sm') === mq.matches) return;
+    on = want; screen.classList.toggle('sm', mq.matches);
+    if (!on) { cur = null; screen.classList.remove('sm-kb', 'sm-editing'); screen.style.height = screen.style.top = screen.style.bottom = ''; applySheet(); return; }
+    build(); applySheet(); renderCtx(); waitBoot(0);
+  }
+  function waitBoot(n) {
+    if (!on) return;
+    if (cv()) { tune(); relayout(true); return; }
+    if (n < 60) setTimeout(() => waitBoot(n + 1), 100);
+  }
+  // Touch-friendly handles + no drag-select box (the gesture layer owns multi-finger input).
+  function tune() {
+    if (!window.fabric) return;
+    fabric.Object.prototype.set({ cornerSize: 22, touchCornerSize: 48, borderScaleFactor: 2, padding: 4 });
+    const c = cv(); if (c) { c.selection = false; c.targetFindTolerance = 10; c.allowTouchScrolling = false; }
+    bindCanvas();
+  }
+  function bindCanvas() {
+    const c = cv(); if (!c || bound) return; bound = true;
+    const upd = () => { if (on) renderCtx(); };
+    ['selection:created', 'selection:updated', 'selection:cleared', 'object:modified'].forEach(ev => c.on(ev, upd));
+    c.on('text:editing:entered', () => { editing = true; screen.classList.add('sm-editing'); renderCtx(); setTimeout(reveal, 380); });
+    c.on('text:editing:exited', () => { editing = false; screen.classList.remove('sm-editing'); renderCtx(); });
+    c.on('mouse:down', () => { if (on && cur) { const t = document.activeElement; if (t && t.blur && t.closest && t.closest('.studio-panel')) t.blur(); } });
+  }
+
+  // ---------------------------------------------------------------- sheets
+  function applySheet() {
+    ['drawer', 'panel', 'more'].forEach(k => screen.classList.toggle('sm-s-' + k, on && cur === k));
+    screen.classList.toggle('sm-sheet', on && !!cur);
+    screen.classList.toggle('sm-full', on && !!cur && full);
+    const body = screen.querySelector('.studio-body'); if (body) body.style.removeProperty('--sh');
+    document.querySelectorAll('.sm-bb').forEach(b => {
+      const k = b.dataset.bar; let a = false;
+      const tab = (window.Studio && Studio.api) ? cur === 'drawer' && curTab : null;
+      if (k === 'layers') a = cur === 'panel' && panelTabNow() === 'layers';
+      else if (k === 'more') a = cur === 'more';
+      else if (k === 'shapes') a = cur === 'drawer' && curTab === 'elements' && lastBar === 'shapes';
+      else if (k === 'elements') a = cur === 'drawer' && curTab === 'elements' && lastBar !== 'shapes';
+      else if (k === 'photos') a = false;
+      else a = cur === 'drawer' && curTab === k;
+      b.classList.toggle('active', a);
+    });
+    relayout();
+  }
+  let curTab = null, lastBar = null;
+  const panelTabNow = () => { const t = document.querySelector('.studio-panel-tab.active'); return t ? t.dataset.ptab : ''; };
+  function showDrawer(tab, bar) {
+    curTab = tab; lastBar = bar || tab;
+    Studio.openDrawer(tab);               // wrapper sets cur = 'drawer'
+    if (window.StudioLib && tab === 'elements') StudioLib.setSub(bar === 'shapes' ? 'Shapes' : 'Stickers');
+    const b = $('studioDrawerBody'); if (b) b.scrollTop = 0;
+  }
+  function showPanel(tab, sec) {
+    if (cur === 'drawer') { const oc = Studio.closeDrawer; oc(); }
+    cur = 'panel'; studioSetPanelTab(tab || 'props'); applySheet();
+    if (sec) openSection(sec);
+  }
+  function showMore() {
+    if (cur === 'drawer') Studio.closeDrawer();
+    cur = 'more'; renderMore(); applySheet();
+  }
+  function closeSheet() { if (cur === 'drawer') { Studio.closeDrawer(); return; } cur = null; applySheet(); }
+  function openSection(id) {
+    const c = cv(), o = c && c.getActiveObject();
+    if (!o) { studioSetPanelTab('props'); return; }
+    studioSetPanelTab('props');
+    const body = $('studioPropsBody'); if (!body) return;
+    let target = null;
+    body.querySelectorAll('details.studio-sec').forEach(d => { const m = (d.getAttribute('ontoggle') || '').match(/secToggle\('([^']+)'/); if (m && m[1] === id) target = d; });
+    if (!target) return;
+    body.querySelectorAll('details.studio-sec').forEach(d => { d.open = (d === target); });
+    setTimeout(() => { try { target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* ignore */ } }, 60);
+  }
+
+  // drag the grabber to resize the sheet; drag far down to close
+  function initGrab() {
+    let y0 = 0, h0 = 0, bodyH = 0, el = null, moved = false;
+    screen.addEventListener('pointerdown', e => {
+      const g = e.target.closest && e.target.closest('[data-grab], .sm-sheet-title'); if (!on || !g) return;
+      el = g.closest('.studio-drawer,.studio-panel'); if (!el) return;
+      y0 = e.clientY; h0 = el.getBoundingClientRect().height; bodyH = screen.querySelector('.studio-body').getBoundingClientRect().height; moved = false;
+      try { g.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
+    });
+    screen.addEventListener('pointermove', e => {
+      if (!el) return; const dy = e.clientY - y0; if (Math.abs(dy) > 4) moved = true; if (!moved) return;
+      const h = Math.max(70, Math.min(bodyH - 90, h0 - dy)); screen.querySelector('.studio-body').style.setProperty('--sh', h + 'px');
+      e.preventDefault();
+    });
+    const end = e => {
+      if (!el) return; const b = screen.querySelector('.studio-body'); const h = parseFloat(b.style.getPropertyValue('--sh')) || 0; el = null;
+      if (!moved) return;
+      if (h && h < 110) { closeSheet(); return; }
+      full = h > bodyH * 0.6; b.style.removeProperty('--sh'); applySheet();
+    };
+    screen.addEventListener('pointerup', end); screen.addEventListener('pointercancel', end);
+  }
+
+  // ---------------------------------------------------------------- More sheet
+  function renderMore() {
+    const isAdmin = window.STATE && STATE.profile && STATE.profile.is_admin;
+    const items = [
+      ['✦', 'Makers', 'Logo, card, social…', "window.StudioTools&&StudioTools.openHub()"],
+      ['📐', 'Resize', 'Page size & presets', "tab:sizes"],
+      ['⚙', 'Canvas & align', 'Size, align to page', "panel:design"],
+      ['💾', 'My designs', 'Open saved designs', "window.StudioStore&&StudioStore.openMyDesigns('designs')"],
+      ['#', 'Grid', 'Grid & snapping', "Studio.toggleGrid()"],
+      ['⛓', 'Group', 'Group selected', "Studio.groupSelection()"],
+      ['🔗', 'Ungroup', 'Ungroup selected', "Studio.ungroupSelection()"],
+      ['🔒', 'Lock', 'Lock / unlock', "Studio.toggleLockSelection()"],
+      ['☑', 'Select all', 'Select every object', "Studio.selectAll()"],
+      ['⎘', 'Copy', 'Copy selection', "Studio.copySelection()"],
+      ['📋', 'Paste', 'Paste copied', "Studio.pasteSelection()"],
+      ['➕', 'Add page', 'New blank page', "Studio.addPage()"]
+    ];
+    if (isAdmin) items.push(['🛠', 'Admin', 'Admin dashboard', "window.StudioStore&&StudioStore.openAdmin()"]);
+    screen.querySelector('.sm-more-body').innerHTML = `<div class="sm-more-grid">${items.map(([i, l, s, f]) => `<button class="sm-mbtn" data-more="${f.replace(/"/g, '&quot;')}"><i>${i}</i><b>${l}</b><small>${s}</small></button>`).join('')}</div>
+      <p class="studio-hint">Tip: pinch with two fingers to zoom, drag with two fingers to move the page. Double-tap text to type.</p>`;
+  }
+  function doMore(f) {
+    if (f.startsWith('tab:')) { showDrawer(f.slice(4)); return; }
+    if (f.startsWith('panel:')) { showPanel(f.slice(6)); return; }
+    try { (new Function(f))(); } catch (e) { /* module absent */ }
+    if (!/openHub|openMyDesigns|openAdmin/.test(f)) { cur = null; applySheet(); }
+  }
+
+  // ---------------------------------------------------------------- click router
+  function onClick(e) {
+    if (!on) return;
+    const bb = e.target.closest('[data-bar]'); if (bb) { bar(bb.dataset.bar); return; }
+    const mm = e.target.closest('[data-more]'); if (mm) { doMore(mm.dataset.more); return; }
+    const a = e.target.closest('[data-a]'); if (a) { act(a.dataset.a, a); }
+  }
+  function bar(k) {
+    const toggled = (match) => { if (match) { closeSheet(); return true; } return false; };
+    if (k === 'photos') { $('smPhotoInput').click(); return; }
+    if (k === 'layers') { if (toggled(cur === 'panel' && panelTabNow() === 'layers')) return; showPanel('layers'); return; }
+    if (k === 'more') { if (toggled(cur === 'more')) return; showMore(); return; }
+    if (k === 'shapes') { if (toggled(cur === 'drawer' && curTab === 'elements' && lastBar === 'shapes')) return; showDrawer('elements', 'shapes'); return; }
+    if (k === 'elements') { if (toggled(cur === 'drawer' && curTab === 'elements' && lastBar !== 'shapes')) return; showDrawer('elements', 'elements'); return; }
+    if (toggled(cur === 'drawer' && curTab === k)) return;
+    showDrawer(k);
+  }
+
+  // ---------------------------------------------------------------- contextual bar
+  function kindOf(o) {
+    if (!o) return null;
+    if (o.type === 'activeSelection') return 'multi';
+    if (o.studioCurve) return 'curved';
+    if (/text/.test(o.type)) return 'text';
+    if (o.type === 'image') return 'image';
+    if (o.type === 'group') return 'group';
+    return 'shape';
+  }
+  const CB = (i, l, a, cls) => `<button class="sm-cb ${cls || ''}" data-a="${a}"><i>${i}</i><span>${l}</span></button>`;
+  let lastKind = null;
+  function renderCtx() {
+    const el = $('smCtx'); if (!el) return;
+    const c = cv(), o = c && c.getActiveObject(), k = kindOf(o) + (editing ? ':e' : '');
+    let h = '';
+    const common = CB('⧉', 'Duplicate', 'dup') + CB('🗑', 'Delete', 'del', 'danger');
+    const kk = k.replace(':e', '');
+    if (editing && kk === 'text') {
+      h = CB('✓', 'Done', 'done', 'primary') + CB('<b>B</b>', 'Bold', 'bold') + CB('<i>I</i>', 'Italic', 'italic') + CB('≡', 'Align', 'align') + CB('A−', 'Smaller', 'sizeDn') + CB('A+', 'Bigger', 'sizeUp') + CB('🎨', 'Colour', 'sec:main') + CB('Aa', 'Font', 'sec:main');
+    } else if (kk === 'text') {
+      h = CB('✎', 'Edit', 'edit', 'primary') + CB('Aa', 'Font', 'sec:main') + CB('🎨', 'Colour', 'sec:main') + CB('A−', 'Smaller', 'sizeDn') + CB('A+', 'Bigger', 'sizeUp') + CB('<b>B</b>', 'Bold', 'bold') + CB('<i>I</i>', 'Italic', 'italic') + CB('≡', 'Align', 'align') +
+        CB('↔', 'Spacing', 'sec:main') + CB('✨', 'Effects', 'sec:textfx') + CB('◐', 'Shadow', 'sec:shadow') + CB('⊞', 'Arrange', 'sec:pos') + common;
+    } else if (kk === 'curved') {
+      h = CB('Aa', 'Style', 'sec:main') + CB('◐', 'Shadow', 'sec:shadow') + CB('↻', 'Rotate', 'rot') + CB('⊞', 'Arrange', 'sec:pos') + common;
+    } else if (kk === 'image') {
+      h = CB('⇄', 'Replace', 'replace', 'primary') + CB('✂', 'Crop', 'sec:crop') + CB('☀', 'Adjust', 'sec:adjust') + CB('🎞', 'Filters', 'sec:main') + CB('⇋', 'Flip', 'flip') + CB('↻', 'Rotate', 'rot') + CB('◌', 'Opacity', 'sec:pos') +
+        CB('▢', 'Frame', 'sec:frame') + CB('⊞', 'Arrange', 'sec:pos') + common;
+    } else if (kk === 'shape' || kk === 'group') {
+      h = CB('🎨', 'Style', 'sec:main') + CB('◌', 'Opacity', 'sec:pos') + CB('◐', 'Shadow', 'sec:shadow') + CB('⇋', 'Flip', 'flip') + CB('↻', 'Rotate', 'rot') + CB('⊞', 'Arrange', 'sec:pos') + (kk === 'group' ? CB('🔗', 'Ungroup', 'ungroup') : '') + common;
+    } else if (kk === 'multi') {
+      h = CB('⛓', 'Group', 'group') + CB('⊞', 'Align', 'sec:main') + common;
+    }
+    el.innerHTML = h; el.classList.toggle('empty', !h);
+    if (k !== lastKind) { el.scrollLeft = 0; lastKind = k; }
+    screen.classList.toggle('sm-has-ctx', !!h);
+    if (h) relayout();
+  }
+
+  function act(name, btn) {
+    const c = cv(), o = c && c.getActiveObject();
+    const S = window.Studio, FX = window.StudioFx;
+    switch (name) {
+      case 'close': closeSheet(); return;
+      case 'expand': full = !full; applySheet(); return;
+      case 'zin': zoomBy(1.25); return;
+      case 'zout': zoomBy(0.8); return;
+      case 'zfit': S.fitZoom(); return;
+      case 'dup': S.duplicateSelection(); return;
+      case 'del': S.deleteSelection(); return;
+      case 'group': S.groupSelection(); return;
+      case 'ungroup': S.ungroupSelection(); return;
+      case 'flip': S.flip('x'); return;
+      case 'replace': $('smReplaceInput').click(); return;
+    }
+    if (!o) return;
+    if (name.startsWith('sec:')) { showPanel('props', name.slice(4)); return; }
+    switch (name) {
+      case 'edit': startEdit(o); break;
+      case 'done': try { o.exitEditing(); } catch (e) { /* ignore */ } c.requestRenderAll(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); break;
+      case 'rot': { const p = o.getCenterPoint(); o.rotate(((o.angle || 0) + 90) % 360); o.setPositionByOrigin(p, 'center', 'center'); o.setCoords(); c.requestRenderAll(); A().commit(); break; }
+      case 'sizeUp': case 'sizeDn': {
+        const cur0 = Math.round((o.fontSize || 40) * (o.scaleY || 1)); let n = Math.round(name === 'sizeUp' ? cur0 * 1.1 : cur0 / 1.1);
+        if (n === cur0) n += name === 'sizeUp' ? 1 : -1;
+        if (FX) FX.setFontSize(Math.max(6, n)); break; }
+      case 'bold': { const b = ['bold', '700', '800', '900', 700, 800, 900].includes(o.fontWeight); S.setProp('fontWeight', b ? 'normal' : 'bold'); break; }
+      case 'italic': S.setProp('fontStyle', o.fontStyle === 'italic' ? 'normal' : 'italic'); break;
+      case 'align': { const seq = ['left', 'center', 'right']; S.setProp('textAlign', seq[(seq.indexOf(o.textAlign) + 1) % 3]); break; }
+    }
+    if (name !== 'done') renderCtx();
+  }
+  function startEdit(o) {
+    if (!o.enterEditing) return;
+    try { o.enterEditing(); if (o.selectAll) o.selectAll(); if (o.hiddenTextarea) o.hiddenTextarea.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+    cv().requestRenderAll();
+  }
+
+  // Replace the selected photo, keeping its position, rotation and on-screen size.
+  function replaceImage(file) {
+    const c = cv(), old = c && c.getActiveObject(); const a = A();
+    if (!old || old.type !== 'image') return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) { window.toast && toast('Use PNG, JPG or WebP images', true); return; }
+    const r = new FileReader();
+    r.onload = ev => a.downscale(ev.target.result, file.type, url => {
+      fabric.Image.fromURL(url, img => {
+        if (!img || !img.width) { window.toast && toast('Could not load that image', true); return; }
+        const box = old.getBoundingRect(true, true), p = old.getCenterPoint();
+        const s = Math.min(box.width / img.width, box.height / img.height) || 1, idx = c.getObjects().indexOf(old);
+        img.set({ originX: 'center', originY: 'center', left: p.x, top: p.y, scaleX: s, scaleY: s, angle: old.angle || 0, opacity: old.opacity == null ? 1 : old.opacity, studioKind: 'image', studioFx: { origW: img.width, origH: img.height } });
+        c.remove(old); c.insertAt(img, idx < 0 ? c.getObjects().length : idx, false); c.setActiveObject(img); c.requestRenderAll(); a.commit();
+        if (window.toast) toast('Photo replaced');
+      }, { crossOrigin: 'anonymous' });
+    });
+    r.readAsDataURL(file);
+  }
+
+  // ---------------------------------------------------------------- layout / viewport
+  let relT = 0;
+  function relayout(now) {
+    clearTimeout(relT);
+    relT = setTimeout(() => {
+      const a = A(); if (!on || !a || !a.isBooted()) return;
+      if (editing) reveal();
+      else if (!Studio.isUserZoomed()) Studio.fitZoom();
+      const c = cv(); if (c) c.calcOffset();
+    }, now ? 0 : 60);
+  }
+  function onViewport() {
+    if (!on) return; const v = window.visualViewport;
+    const kb = window.innerHeight - v.height > 120;
+    screen.classList.toggle('sm-kb', kb);
+    if (kb) { screen.style.top = v.offsetTop + 'px'; screen.style.height = v.height + 'px'; screen.style.bottom = 'auto'; }
+    else { screen.style.top = ''; screen.style.height = ''; screen.style.bottom = ''; }
+    relayout(); if (kb) setTimeout(reveal, 120);
+  }
+  // Scroll the canvas so the selected object is visible above the keyboard / sheet.
+  function reveal() {
+    const c = cv(), o = c && c.getActiveObject(); if (!o || !scr) return;
+    o.setCoords(); const b = o.getBoundingRect(true, true), z = Studio.getZoom();
+    const sr = scr.getBoundingClientRect(), st = stack.getBoundingClientRect();
+    const top = st.top + b.top * z, bot = top + b.height * z, left = st.left + b.left * z, right = left + b.width * z;
+    const pad = 16; let dy = 0, dx = 0;
+    if (top < sr.top + pad) dy = top - sr.top - pad; else if (bot > sr.bottom - pad) dy = Math.min(bot - sr.bottom + pad, top - sr.top - pad);
+    if (left < sr.left + pad) dx = left - sr.left - pad; else if (right > sr.right - pad) dx = Math.min(right - sr.right + pad, left - sr.left - pad);
+    if (dx || dy) { scr.scrollTop += dy; scr.scrollLeft += dx; if (c) c.calcOffset(); }
+  }
+
+  // ---------------------------------------------------------------- zoom + gestures
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+  function fitValue() {
+    const cs = getComputedStyle(scr), pad = (parseFloat(cs.paddingLeft) || 0) * 2, padY = (parseFloat(cs.paddingTop) || 0) * 2, s = A().size();
+    return Math.max(0.05, Math.min((scr.clientWidth - pad) / s.w, (scr.clientHeight - padY) / s.h));
+  }
+  // Zoom so the design point at stack-local (ox,oy) ends up under screen point (tx,ty).
+  function zoomAbout(z1, ox, oy, tx, ty) {
+    const z0 = Studio.getZoom(); Studio.setZoom(z1); const r = Studio.getZoom() / z0;
+    const st = stack.getBoundingClientRect();
+    scr.scrollLeft += st.left + ox * r - tx; scr.scrollTop += st.top + oy * r - ty;
+    const c = cv(); if (c) c.calcOffset();
+  }
+  function zoomBy(f) {
+    const sr = scr.getBoundingClientRect(), st = stack.getBoundingClientRect(), cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
+    const z1 = Math.max(fitValue() * 0.4, Math.min(3, Studio.getZoom() * f));
+    zoomAbout(z1, cx - st.left, cy - st.top, cx, cy);
+  }
+
+  let g = null, panS = null, snap = null;
+  function rememberObj() {
+    const c = cv(), o = c && c.getActiveObject(); snap = o ? { o, l: o.left, t: o.top, sx: o.scaleX, sy: o.scaleY, a: o.angle } : null;
+  }
+  function bindGestures() {
+    const O = { capture: true, passive: false };
+    wrap.addEventListener('touchstart', e => {
+      if (!on) return;
+      const n = e.touches.length;
+      if (n === 2 && !g) { startPinch(e); e.preventDefault(); e.stopPropagation(); }
+      else if (g || n > 2) { e.preventDefault(); e.stopPropagation(); }
+      else if (n === 1) {
+        if (!e.target.closest('.canvas-container') && !e.target.closest('.sm-zoom')) { panS = { x: e.touches[0].clientX, y: e.touches[0].clientY, l: scr.scrollLeft, t: scr.scrollTop }; e.preventDefault(); }
+        else rememberObj();
+      }
+    }, O);
+    wrap.addEventListener('touchmove', e => {
+      if (!on) return;
+      if (g) { movePinch(e); e.preventDefault(); e.stopPropagation(); }
+      else if (panS && e.touches.length === 1) { scr.scrollLeft = panS.l - (e.touches[0].clientX - panS.x); scr.scrollTop = panS.t - (e.touches[0].clientY - panS.y); e.preventDefault(); }
+    }, O);
+    const end = e => {
+      if (!on) return;
+      if (g) { e.stopPropagation(); if (e.touches.length < 2 && !g.done) endPinch(); if (e.touches.length === 0) g = null; }
+      if (e.touches.length === 0) { panS = null; snap = null; }
+    };
+    wrap.addEventListener('touchend', end, O); wrap.addEventListener('touchcancel', end, O);
+  }
+  function startPinch(e) {
+    // The first finger may already have started dragging an object: undo that and cancel Fabric's transform.
+    const c = cv();
+    if (c) {
+      if (snap && snap.o) { snap.o.set({ left: snap.l, top: snap.t, scaleX: snap.sx, scaleY: snap.sy, angle: snap.a }); snap.o.setCoords(); }
+      c._currentTransform = null; c._groupSelector = null; c.mainTouchId = null; c.requestRenderAll();
+    }
+    const t = e.touches, m = mid(t), st = stack.getBoundingClientRect();
+    g = { d0: dist(t), z0: Studio.getZoom(), ox: m.x - st.left, oy: m.y - st.top, cx0: m.x, cy0: m.y, r: 1, cx: m.x, cy: m.y, done: false, min: fitValue() * 0.4 };
+    stack.style.transformOrigin = g.ox + 'px ' + g.oy + 'px'; stack.style.willChange = 'transform';
+  }
+  function movePinch(e) {
+    if (e.touches.length < 2 || g.done) return;
+    const t = e.touches, m = mid(t);
+    g.r = Math.max(g.min / g.z0, Math.min(3 / g.z0, dist(t) / g.d0)); g.cx = m.x; g.cy = m.y;
+    stack.style.transform = `translate(${m.x - g.cx0}px,${m.y - g.cy0}px) scale(${g.r})`;
+  }
+  function endPinch() {
+    g.done = true; stack.style.transform = ''; stack.style.transformOrigin = ''; stack.style.willChange = '';
+    zoomAbout(g.z0 * g.r, g.ox, g.oy, g.cx, g.cy);
+  }
+
+  // ---------------------------------------------------------------- start-up
+  function init() {
+    screen = $('screen-studio'); if (!screen) return;
+    const check = () => apply();
+    if (window.MutationObserver) new MutationObserver(check).observe(screen, { attributes: true, attributeFilter: ['class'] });
+    (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(check);
+    window.addEventListener('orientationchange', () => setTimeout(() => relayout(), 300));
+    check();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  return { apply, renderCtx, reveal, zoomBy, replaceImage, showPanel, showDrawer, closeSheet, isOn: () => on };
+})();
 
 // ======================= video.js =======================
 // ===================================================================================
@@ -6455,5 +6898,102 @@ var VideoMaker = (() => {
   }
 
   return { renderSlides, setLogo, setLogoOpt, clearLogo, setPhoto2, setTextScale, setAllDur, setOv, setPreset, resetOv, setBgImage, clearBgImage, setVol, open, close, setRatio, setTrans, setBrand, setTheme, setLang, setMusic, addFiles, addTextSlide, fromTheme, upd, move, del, togglePlay, exportVideo, THEMES, pickMime };
+})();
+
+// ======================= pwa.js =======================
+/* App install (PWA): registers the service worker, shows an "Install app" bar when the browser allows it
+   (Android Chrome / Edge / desktop Chrome) and explains "Add to Home Screen" on iPhone. */
+var PWA = (() => {
+  let deferred = window.__bip || null, bar = null, waiters = [];
+  const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
+  const dismissedRecently = () => { const t = +LS.get('pwaDismissed') || 0; return Date.now() - t < 7 * 864e5; };
+  const canShow = () => !standalone();
+
+  // Logs installs / app launches (one row per device per day for "opened") so the admin panel can count them.
+  function deviceId() { let d = LS.get('opsDevice'); if (!d) { d = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2); LS.set('opsDevice', d); } return d; }
+  function track(event) {
+    try {
+      if (typeof sb === 'undefined') return;
+      const uid = (window.STATE && STATE.user && STATE.user.id) || null;
+      sb.from('app_installs').insert({ device_id: deviceId(), user_id: uid, event, ua: navigator.userAgent.slice(0, 200) }).then(() => { }, () => { });
+    } catch (e) { /* table not created yet: ignore */ }
+  }
+  function trackOpen() {
+    if (!standalone()) return;
+    const day = new Date().toISOString().slice(0, 10);
+    if (LS.get('opsOpenDay') === day) return;
+    LS.set('opsOpenDay', day); if (!LS.get('opsInstLogged')) { LS.set('opsInstLogged', '1'); track('installed'); } track('opened');
+  }
+  function register() {
+    if (!('serviceWorker' in navigator)) return;
+    if (!/^https:|^http:\/\/localhost/.test(location.protocol + '//' + location.hostname) && location.protocol !== 'https:') return;
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => { }));
+  }
+  function buildBar() {
+    if (bar || !document.body) return;
+    bar = document.createElement('div'); bar.id = 'installBar';
+    bar.innerHTML = '<span class="ib-ico">📲</span><span class="ib-txt"><b>Install Offer Poster Studio</b><small>ഫോണിൽ App ആയി ഉപയോഗിക്കാം</small></span><button class="ib-go" type="button">Install</button><button class="ib-x" type="button" aria-label="Close">✕</button>';
+    bar.querySelector('.ib-go').onclick = install;
+    bar.querySelector('.ib-x').onclick = () => { LS.set('pwaDismissed', Date.now()); refresh(); };
+    document.body.appendChild(bar);
+  }
+  function refresh() {
+    const show = canShow();
+    const pb = document.getElementById('installBtnProfile'); if (pb) pb.style.display = show ? '' : 'none';
+    if (show && !dismissedRecently()) { buildBar(); bar.classList.add('show'); } else if (bar) bar.classList.remove('show');
+  }
+  async function install() {
+    if (!deferred && !isIOS()) {   // Chrome may still be deciding: wait a moment for its install signal
+      if (window.toast) toast('Installing… ഒരു നിമിഷം');
+      await new Promise(res => { waiters.push(res); setTimeout(res, 3000); });
+    }
+    if (deferred) {
+      try { deferred.prompt(); const c = await deferred.userChoice; if (c && c.outcome === 'accepted') { deferred = null; } } catch (e) { /* ignore */ }
+      refresh(); return;
+    }
+    help(isIOS());
+  }
+  function help(ios) {
+    let m = document.getElementById('iosInstallHelp');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'iosInstallHelp';
+      m.innerHTML = '<div class="ios-card"><h3 id="iosH"></h3><ol id="iosL"></ol><p id="iosP"></p><pre id="iosD"></pre><button class="btn btn-primary btn-block" type="button">OK</button></div>';
+      m.onclick = e => { if (e.target === m || e.target.tagName === 'BUTTON') m.classList.remove('show'); };
+      document.body.appendChild(m);
+    }
+    m.querySelector('#iosH').textContent = ios ? 'iPhone-ൽ Install ചെയ്യാൻ' : 'Android-ൽ Install ചെയ്യാൻ';
+    m.querySelector('#iosL').innerHTML = ios
+      ? '<li>Safari-യുടെ താഴെയുള്ള <b>Share</b> ബട്ടൺ (⬆︎) അമർത്തുക</li><li><b>Add to Home Screen</b> തിരഞ്ഞെടുക്കുക</li><li><b>Add</b> അമർത്തുക</li>'
+      : '<li>Chrome-ന്റെ മുകളിൽ വലത്തെ <b>⋮</b> മെനു തുറക്കുക</li><li><b>Install app</b> അല്ലെങ്കിൽ <b>Add to Home screen</b> അമർത്തുക</li><li><b>Install</b> അമർത്തുക</li>';
+    m.querySelector('#iosP').textContent = ios ? 'Chrome-ൽ ആണെങ്കിൽ Safari-യിൽ തുറന്ന് ഇതേ ചെയ്യുക.' : 'Menu-ൽ ഓപ്ഷൻ കാണുന്നില്ലെങ്കിൽ Chrome-ൽ തന്നെ www.offerposterstudio.in തുറന്നിട്ടുണ്ടോ എന്ന് നോക്കുക (WhatsApp/Instagram ഉള്ളിലെ browser-ൽ വരില്ല).';
+    m.classList.add('show');
+    diagnose(m.querySelector('#iosD'), ios);
+  }
+  // Shows exactly which install requirement is missing on the live site (helps when Chrome offers no install).
+  async function diagnose(el, ios) {
+    if (ios) { el.textContent = ''; return; }
+    const L = [], ok = (b, t) => L.push((b ? '✓ ' : '✗ ') + t);
+    el.textContent = 'Checking…';
+    ok(!!document.querySelector('link[rel="manifest"]'), 'index.html has manifest link');
+    try { const r = await fetch('/manifest.webmanifest', { cache: 'no-store' }); const j = await r.json(); ok(!!(j && j.icons && j.icons.length), 'manifest.webmanifest found'); }
+    catch (e) { ok(false, 'manifest.webmanifest missing (site page returned instead)'); }
+    try { const r = await fetch('/sw.js', { cache: 'no-store' }); const t = await r.text(); ok(/ops-shell/.test(t), 'sw.js found'); }
+    catch (e) { ok(false, 'sw.js missing'); }
+    try { const r = await fetch('/icon-512.png', { cache: 'no-store' }); ok(r.ok && /image\/png/.test(r.headers.get('content-type') || ''), 'icon-512.png found'); }
+    catch (e) { ok(false, 'icon-512.png missing'); }
+    try { const g = await navigator.serviceWorker.getRegistration(); ok(!!g, 'service worker registered'); } catch (e) { ok(false, 'service worker not registered'); }
+    ok(location.protocol === 'https:', 'https');
+    el.textContent = L.join('\n');
+  }
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; window.__bip = e; refresh(); const w = waiters; waiters = []; w.forEach(f => f()); });
+  window.addEventListener('appinstalled', () => { deferred = null; LS.set('opsInstLogged', '1'); track('installed'); LS.set('pwaDismissed', Date.now()); refresh(); if (window.toast) toast('App installed ✓'); });
+  window.installApp = install;
+  register();
+  setTimeout(trackOpen, 5000);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refresh); else setTimeout(refresh, 0);
+  setTimeout(refresh, 1500);
+  return { install, refresh, isStandalone: standalone };
 })();
 

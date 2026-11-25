@@ -433,3 +433,140 @@ body.desktop-view #screen-studio{ max-width:100%; }
   #screen-studio.drawer-open .studio-panel{ display:none; }
   .studio-tpl-grid{ grid-template-columns:repeat(2,1fr); }
 }
+
+/* ===== Studio – phone layout (<=760px). Scoped to #screen-studio.sm so desktop is untouched. ===== */
+.sm-only{ display:none; }
+#screen-studio.sm .sm-only{ display:flex; }
+body.studio-sm{ overflow:hidden; overscroll-behavior:none; }
+body.studio-sm #viewModeToggle{ display:none !important; }
+#screen-studio.sm{
+  max-width:none; touch-action:manipulation; overscroll-behavior:none; -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+#screen-studio.sm input, #screen-studio.sm textarea{ -webkit-user-select:text; user-select:text; }
+#screen-studio.sm input, #screen-studio.sm select, #screen-studio.sm textarea{ font-size:16px !important; }
+
+/* top bar: Back · name · Undo · Redo · Save · Export */
+#screen-studio.sm .studio-topbar{ padding:6px 8px; gap:4px; }
+#screen-studio.sm .studio-topbar .icon-btn{ width:40px; height:40px; font-size:19px; flex-shrink:0; }
+#screen-studio.sm .studio-name-input{ font-size:16px !important; padding:6px 4px; }
+#screen-studio.sm .studio-topbar-actions{ gap:4px; }
+#screen-studio.sm .studio-topbar-actions .btn{ min-height:40px; padding:0 11px; }
+#screen-studio.sm .studio-toolbar{ display:none; }
+
+/* canvas area */
+#screen-studio.sm .studio-body{ flex-direction:column; --sh:44%; }
+#screen-studio.sm.sm-full .studio-body{ --sh:80%; }
+#screen-studio.sm.sm-kb .studio-body{ --sh:46%; }
+#screen-studio.sm .studio-main{ order:1; flex:1 1 0; min-height:110px; }
+#screen-studio.sm .studio-canvas-wrap{ touch-action:none; }
+#screen-studio.sm .studio-ruler{ display:none; }
+#screen-studio.sm .studio-canvas-scroll{ top:0; left:0; padding:10px; overflow:hidden; touch-action:none; }
+#screen-studio.sm .studio-canvas-stack{ margin:auto; }
+#screen-studio.sm .studio-pagebar{ padding:4px 8px; }
+#screen-studio.sm .studio-page-chip{ height:34px; min-width:38px; }
+
+/* zoom controls */
+.sm-zoom{ position:absolute; right:10px; bottom:10px; z-index:6; align-items:center; background:rgba(255,255,255,.96); border-radius:22px; box-shadow:0 2px 10px rgba(0,0,0,.28); overflow:hidden; }
+.sm-zoom button{ height:40px; min-width:42px; border:none; background:none; font-size:21px; font-weight:700; color:var(--ink); }
+.sm-zoom button:active{ background:var(--cream-2); }
+#smZoomLbl{ font-size:12px !important; min-width:54px; }
+
+/* bottom sheets (library drawer, edit panel, more) */
+#screen-studio.sm .studio-drawer, #screen-studio.sm .studio-panel, #screen-studio.sm .sm-more{
+  order:2; position:relative; left:auto; right:auto; bottom:auto; width:100%; height:var(--sh); max-height:none; flex:0 0 var(--sh);
+  border:none; border-top:2px solid var(--teal); border-radius:16px 16px 0 0; box-shadow:0 -6px 18px rgba(0,0,0,.18); z-index:5;
+  display:none; flex-direction:column; min-height:0; overflow:hidden;
+}
+#screen-studio.sm.sm-s-drawer .studio-drawer.open{ display:flex; }
+#screen-studio.sm.sm-s-panel .studio-panel{ display:flex; }
+#screen-studio.sm.sm-s-more .sm-more{ display:flex; }
+#screen-studio.sm.drawer-open .studio-panel{ display:none; }
+#screen-studio.sm.sm-s-panel .studio-panel, #screen-studio.sm.sm-s-more .sm-more{ background:var(--paper); }
+.sm-more{ display:none; }
+.sm-sheet-head{ position:relative; align-items:center; gap:6px; height:38px; padding:0 6px 0 14px; flex-shrink:0; }
+.sm-grab{ position:absolute; inset:0; touch-action:none; z-index:0; }
+.sm-grab::after{ content:''; position:absolute; left:50%; top:7px; width:44px; height:5px; border-radius:3px; background:#cfc8b4; transform:translateX(-50%); }
+.sm-sheet-title{ position:relative; z-index:1; flex:1; font-size:13px; font-weight:800; pointer-events:none; padding-top:6px; }
+.sm-hbtn{ position:relative; z-index:1; width:38px; height:32px; margin-top:4px; border:none; border-radius:9px; background:var(--cream-2); font-size:15px; font-weight:700; color:var(--ink); }
+.sm-hbtn:active{ background:var(--line); }
+#screen-studio.sm .studio-drawer-head .icon-btn{ display:none; }
+#screen-studio.sm .studio-dtab{ padding:11px 12px; font-size:12.5px; }
+#screen-studio.sm .studio-drawer-body{ padding:10px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+#screen-studio.sm .studio-panel-block{ padding:10px 12px 16px; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+#screen-studio.sm .studio-panel-tab{ padding:12px 4px; font-size:12.5px; }
+/* search + first filter row stay visible while the list scrolls */
+#screen-studio.sm .studio-drawer-body > .studio-search{ position:sticky; top:-10px; z-index:3; margin:0 0 6px; height:40px; background:var(--cream); }
+#screen-studio.sm .studio-drawer-body > .studio-search + .studio-chiprow{ position:sticky; top:30px; z-index:3; background:var(--paper); padding:4px 0; margin:0 0 6px; }
+#screen-studio.sm .studio-drawer-body > .studio-subtabs{ position:sticky; top:-10px; z-index:3; background:var(--paper); padding:2px 0 6px; }
+#screen-studio.sm .studio-drawer-body > .studio-subtabs + .studio-chiprow{ position:sticky; top:34px; z-index:3; background:var(--paper); padding:2px 0 6px; }
+#screen-studio.sm .studio-subtabs button{ padding:8px 13px; border-radius:99px; border:1.5px solid var(--line); background:var(--cream); font-size:12.5px; font-weight:700; white-space:nowrap; flex:0 0 auto; }
+#screen-studio.sm .studio-subtabs button.active{ background:var(--teal); border-color:var(--teal); color:#fff; }
+
+/* bigger touch targets inside the sheets */
+#screen-studio.sm .btn-sm{ min-height:40px; padding:8px 12px; }
+#screen-studio.sm .studio-chip{ padding:8px 13px; font-size:12.5px; }
+#screen-studio.sm .studio-sec > summary{ padding:13px 12px; font-size:13px; }
+#screen-studio.sm .studio-prop-row{ flex-wrap:wrap; margin-bottom:12px; }
+#screen-studio.sm .studio-prop-row label{ width:74px; font-size:12px; }
+#screen-studio.sm .studio-prop-row input[type="range"]{ height:34px; min-width:120px; }
+#screen-studio.sm .studio-prop-row input[type="color"]{ width:46px; height:38px; }
+#screen-studio.sm .studio-prop-row textarea{ min-height:64px; }
+#screen-studio.sm .studio-layer-row{ padding:12px 10px; font-size:13px; }
+#screen-studio.sm .studio-layer-row button{ font-size:17px; padding:6px 9px; }
+#screen-studio.sm .studio-grid{ grid-template-columns:repeat(4,1fr); }
+#screen-studio.sm .studio-tpl-grid{ grid-template-columns:repeat(2,1fr); }
+#screen-studio.sm .studio-tpl-actions button{ padding:10px 0; }
+#screen-studio.sm .studio-sw{ width:36px; height:36px; }
+#screen-studio.sm .studio-align-row .btn{ min-height:42px; }
+
+/* More sheet */
+.sm-more-body{ flex:1; overflow-y:auto; padding:6px 12px 16px; overscroll-behavior:contain; }
+.sm-more-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.sm-mbtn{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:11px 10px; border-radius:12px; border:1.5px solid var(--line); background:var(--cream); text-align:left; min-height:76px; }
+.sm-mbtn i{ font-style:normal; font-size:20px; }
+.sm-mbtn b{ font-size:12.5px; }
+.sm-mbtn small{ font-size:10.5px; color:var(--muted); line-height:1.25; }
+
+/* contextual selection bar + bottom toolbar */
+.sm-ctx{ order:3; overflow-x:auto; gap:6px; padding:6px 8px; background:var(--paper); border-top:1px solid var(--line); flex-shrink:0; -webkit-overflow-scrolling:touch; }
+.sm-ctx::-webkit-scrollbar, .sm-bar::-webkit-scrollbar{ display:none; }
+#screen-studio.sm .sm-ctx.empty{ display:none; }
+.sm-cb{ flex:0 0 auto; min-width:58px; height:52px; padding:0 8px; border-radius:12px; border:1.5px solid var(--line); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:10.5px; font-weight:700; color:var(--ink); }
+.sm-cb i{ font-style:normal; font-size:17px; line-height:1.15; }
+.sm-cb:active{ background:var(--cream-2); }
+.sm-cb.primary{ background:var(--teal); border-color:var(--teal); color:#fff; }
+.sm-cb.danger{ color:var(--coral); }
+.sm-bar{ order:4; overflow-x:auto; gap:2px; padding:4px 4px calc(4px + env(safe-area-inset-bottom)); background:var(--ink); flex-shrink:0; -webkit-overflow-scrolling:touch; }
+.sm-bb{ flex:0 0 auto; min-width:66px; height:54px; border:none; background:none; color:var(--cream); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:10.5px; font-weight:700; }
+.sm-bb i{ font-style:normal; font-size:19px; line-height:1.15; }
+.sm-bb:active{ background:rgba(251,246,234,.15); }
+.sm-bb.active{ background:var(--gold); color:#1c1204; }
+
+/* keyboard open / typing on the canvas: keep controls visible, free the space */
+#screen-studio.sm.sm-kb .sm-bar, #screen-studio.sm.sm-editing .sm-bar{ display:none; }
+#screen-studio.sm.sm-kb .studio-pagebar{ display:none; }
+#screen-studio.sm .studio-modal{ padding:10px; }
+#screen-studio.sm .studio-modal-card{ max-height:86%; }
+
+/* small / short phones */
+@media (max-height:640px){
+  #screen-studio.sm .studio-body{ --sh:50%; }
+  .sm-bb{ height:48px; } .sm-cb{ height:46px; }
+}
+
+/* ===== App install bar (PWA) ===== */
+#installBar{ position:fixed; left:10px; right:10px; bottom:calc(86px + env(safe-area-inset-bottom)); z-index:900; max-width:540px; margin:0 auto; display:none; align-items:center; gap:10px;
+  padding:10px 10px 10px 12px; background:var(--ink); color:var(--cream); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+#installBar.show{ display:flex; }
+#installBar .ib-ico{ font-size:24px; }
+#installBar .ib-txt{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.25; }
+#installBar .ib-txt b{ font-size:13px; } #installBar .ib-txt small{ font-size:11px; opacity:.75; }
+#installBar .ib-go{ border:none; border-radius:10px; background:var(--gold); color:#1c1204; font-weight:800; font-size:13px; min-height:40px; padding:0 16px; }
+#installBar .ib-x{ border:none; background:rgba(251,246,234,.12); color:var(--cream); width:36px; height:36px; border-radius:50%; font-size:14px; }
+body:has(#screen-studio.active) #installBar, body:has(#screen-editor.active) #installBar, body:has(#screen-auth.active) #installBar{ display:none !important; }
+body.studio-sm #installBar{ display:none !important; }
+#iosInstallHelp{ position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center; padding:16px; }
+#iosInstallHelp.show{ display:flex; }
+#iosInstallHelp .ios-card{ background:var(--paper); border-radius:18px; padding:18px; width:100%; max-width:420px; }
+#iosInstallHelp h3{ margin:0 0 8px; font-size:17px; } #iosInstallHelp ol{ padding-left:20px; line-height:1.7; font-size:14px; } #iosInstallHelp p{ font-size:12px; color:var(--muted); }
